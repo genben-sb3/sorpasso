@@ -1,4 +1,4 @@
-# Freie Assets für APEXLINE: Lizenzen, Kandidaten, Fallstricke
+# Freie Assets für SORPASSO: Lizenzen, Kandidaten, Fallstricke
 
 > Stand: 2026-10-11. Recherche gegen Primärquellen (Lizenztexte, Asset-Seiten, Plattform-APIs).
 > Vorgabe aus `DESIGN.md`: nur **kostenlos**, nur **CC0, CC-BY oder Fab Standard License**; kein NC, kein ND, kein „Editorial“. Fiktive Autos ohne echte Marken.
@@ -9,7 +9,7 @@
 
 ## 0. Kurzfassung
 
-| Quelle | Lizenz | Im Spiel ausliefern? | Namensnennung | Bewertung für APEXLINE |
+| Quelle | Lizenz | Im Spiel ausliefern? | Namensnennung | Bewertung für SORPASSO |
 |---|---|---|---|---|
 | **Fab, Standard License** (auch kostenlose Listings, Megascans) | Fab EULA („Epic Marketplace Content License Agreement“) | Ja, als Teil des Projekts, nicht einzeln | nicht nötig | ✅ Hauptquelle für Umgebung/Megascans. Aufpassen bei „UE-Only“ (für uns egal, wir nutzen UE) |
 | **Fab, CC-BY-Listings** | CC BY 4.0 | Ja | ja | ✅ |
@@ -63,7 +63,7 @@ Die Fab-Seiten blockieren automatisierte Abrufe (HTTP 403). Geprüft wurden:
 ### 1.2 Epic-Inhalte: Engine-Templates, Samples, Epic Content License
 
 - **UE EULA:** „Licensed Technology“ umfasst Engine Code, **„Examples“** („content made available by us in the Samples and Templates folders in the install directory“) und **„Starter Content“**. Diese dürfen in Produkten verbreitet werden ([UE EULA PDF auf Epics CDN](https://cdn1.epicgames.com/eulatracking-download/unreal_engine/en/v2/r1/7be11df29cd87f4c3fe0032ad5bc3220.pdf)). Ob das PDF v2 die aktuelle Fassung ist: **[UNVERIFIZIERT]**, maßgeblich ist [unrealengine.com/eula/unreal](https://www.unrealengine.com/eula/unreal).
-  - Also darf das **Vehicle Template** (Varianten Timetrial mit „SportsCar“ und Offroad mit „OffroadCar“, laut [Epic-Doku](https://dev.epicgames.com/documentation/unreal-engine/vehicle-template-in-unreal-engine)) in APEXLINE stecken. Als Platzhalter für **M1** ist es ideal.
+  - Also darf das **Vehicle Template** (Varianten Timetrial mit „SportsCar“ und Offroad mit „OffroadCar“, laut [Epic-Doku](https://dev.epicgames.com/documentation/unreal-engine/vehicle-template-in-unreal-engine)) in SORPASSO stecken. Als Platzhalter für **M1** ist es ideal.
   - Royalty: 5 % erst ab 1 Mio. USD Lebenszeit-Bruttoumsatz pro Produkt (gleiches PDF). Für ein Gratis-Spiel irrelevant.
 - **Was nicht über den Launcher installiert wird** (Marketplace/Fab-Content), fällt **nicht** unter die UE EULA, sondern unter die Content-Lizenz (gleiches PDF, §1).
 - **City Sample Vehicles** (Fab, kostenlos, von Epic): 13 fahrbare Fahrzeuge (Limousine, Coupé, SUV, Schrägheck, Sportwagen, Pickup, Sattelzug, Müllwagen, Taxi, Bus, Lieferwagen). Kennzeichnung **„UE-Only Content – Licensed for Use Only with Unreal Engine-based Products“**, Format nur Unreal Engine, „Allows usage with AI: No“ ([Fab-Listing, Wayback-Snapshot 2025-11-13](http://web.archive.org/web/20251113193215/https://www.fab.com/listings/2909157b-ddfa-4cef-a925-69dc2467021f)). „UE-Only“ ist laut Fab EULA eine Einschränkung *innerhalb* der Standard License. Für ein UE5-Spiel ist das also okay.
@@ -266,7 +266,7 @@ Lizenz pro Sound direkt auf der Seite geprüft (CC-Link im HTML, Abruf 2026-10-1
 - **USA, Karosserieform als Trade Dress:** In *Ferrari S.p.A. v. Roberts*, 944 F.2d 1235 (6th Cir. 1991), wurde die Außenform von Daytona Spyder und Testarossa als **ungeschützt-eingetragene Trade Dress** anerkannt. Glasfaser-Nachbauten auf fremdem Chassis wurden untersagt ([Volltext](https://law.resource.org/pub/us/case/reporter/F2/944/944.F2d.1235.90-5734.html)). ⇒ Die *Form* allein kann markenrechtlich geschützt sein. Ob das für digitale Darstellungen in Spielen genauso gilt, ist nicht entschieden **[UNVERIFIZIERT]**.
 - **USA, Spiele und echte Fahrzeuge:** *AM General v. Activision* (S.D.N.Y. 2020): Humvees in *Call of Duty* waren über den Rogers-Test (künstlerische Relevanz, nicht ausdrücklich irreführend) geschützt ([Finnegan-Zusammenfassung](https://www.finnegan.com/en/insights/blogs/incontestable/in-legal-warfare-over-humvee-trademarks-the-first-amendment-goes-beyond-the-call-of-duty-in-dismissing-am-generals-claims.html); Primärurteil nicht abgerufen **[UNVERIFIZIERT am Primärtext]**). Der Supreme Court hat den Rogers-Test 2023 in *Jack Daniel's v. VIP Products* eingeschränkt ([Urteil 22-148](https://www.supremecourt.gov/opinions/22pdf/22-148_3e04.pdf), nicht im Detail ausgewertet **[UNVERIFIZIERT]**). Für ein Hobbyprojekt ist „wir würden vor Gericht wohl gewinnen“ ohnehin keine Strategie.
 - **EU, Designschutz gilt jetzt auch digital:** Die Gemeinschaftsgeschmacksmuster-VO (EU) 6/2002 in der Fassung von VO (EU) 2024/2822 definiert „Erzeugnis“ als Gegenstand „regardless of whether it is embodied in a physical object or materialises in a non-physical form“ (Art. 3). Zu den verbotenen Handlungen zählt das Erstellen und Verbreiten von Software, die das Design aufzeichnet, um ein verletzendes Erzeugnis herzustellen (Art. 19(2)(d)) ([EUR-Lex 32024R2822](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R2822)). EUR-Lex vermerkt, dass der Rechtsakt durch VO (EU) 2026/715 abgelöst bzw. kodifiziert wurde (Stand und Inhalt **[UNVERIFIZIERT]**). Eingetragene Designs von Autos sind üblich. Ein naher digitaler Nachbau eines aktuellen Modells ist daher in der EU ein **reales Risiko**. Wie weit das für Spielemodelle reicht, ist gerichtlich ungeklärt **[UNVERIFIZIERT]**.
-- **Für APEXLINE heißt das** (abgeleitet, keine Rechtsberatung):
+- **Für SORPASSO heißt das** (abgeleitet, keine Rechtsberatung):
   1. Keine Modelle verwenden, die als ein bestimmtes echtes Auto *gemeint* sind, auch nicht entlogoisiert („Porsche 911 GT3“ ohne Wappen bleibt ein 911).
   2. „Erkennbar inspiriert“ (DESIGN.md) über *Gattung* lösen (Mittelmotor-Keil, 70er-Coupé, Le-Mans-Prototyp), **nicht über Signatur-Elemente**: markante Grills (z. B. Niere, Schild), typische Leuchtengrafiken, charakteristische Seitenlinien.
   3. Fiktive Namen per Markensuche prüfen ([EUIPO eSearch](https://euipo.europa.eu/eSearch/), [DPMAregister](https://register.dpma.de/)). Wortspiele wie „Vauxhell“ oder „Lamborgotti“ vermeiden.
@@ -302,9 +302,9 @@ Lizenz pro Sound direkt auf der Seite geprüft (CC-Link im HTML, Abruf 2026-10-1
 ## 5. Vorlage: `CREDITS.md`
 
 ```markdown
-# APEXLINE – Credits
+# SORPASSO – Credits
 
-APEXLINE is a free, non-commercial hobby project. All vehicles, brands, tracks and
+SORPASSO is a free, non-commercial hobby project. All vehicles, brands, tracks and
 names in this game are fictional. Any resemblance to real products is unintended.
 
 ## Engine

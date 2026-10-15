@@ -1,6 +1,6 @@
-# APEXLINE – Design-Entscheidungen
+# SORPASSO – Design-Entscheidungen
 
-> Arbeitstitel: **APEXLINE** (interner Projektname „GTO“). Markenprüfung vor Veröffentlichung.
+> Arbeitstitel: **SORPASSO** (interner Projektname „GTO“). Markenprüfung vor Veröffentlichung.
 > Stand: 2026-10-11, Ergebnis eines Grilling-Interviews. Dieses Dokument ist die Grundlage für `/to-spec`.
 
 ## Vision

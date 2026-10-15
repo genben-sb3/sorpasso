@@ -1,4 +1,4 @@
-# Recherche: Eigene Fahrphysik in C++ auf Unreal Engine 5 (APEXLINE)
+# Recherche: Eigene Fahrphysik in C++ auf Unreal Engine 5 (SORPASSO)
 
 > Stand: 2026-10-11. Kontext: [`DESIGN.md`](../DESIGN.md), Abschnitte Fahrphysik, Steuerung, Multiplayer und M1.
 > Ziel: Grundlage für die Spec von **M1 „Fahrgefühl“**. Eigenes Fahrzeugmodell, nicht Chaos Vehicles. Unreal liefert nur Rigid Body und Kollision.
@@ -280,7 +280,7 @@ Grundsatz aus DESIGN.md: Die Physik bleibt unverändert. Fahrhilfen sind ein **S
 ### 9.1 Module und Schnittstellen
 
 ```
-Source/ApexSim/            (UE-Modul, aber Kern ohne UObject-Abhängigkeit)
+Source/GTOSim/            (UE-Modul, aber Kern ohne UObject-Abhängigkeit)
   Input/
     FVehicleInputPacket     { uint32 Tick; float Steer[-1..1]; float Throttle, Brake, Clutch, Handbrake [0..1];
                               int8 GearRequest; uint8 AidFlags; }      // gleiche Struktur für Spieler/KI/Replay/Ghost
@@ -297,9 +297,9 @@ Source/ApexSim/            (UE-Modul, aber Kern ohne UObject-Abhängigkeit)
     FDriverAids             // ABS/TCS/ESC: Packet + State -> Aktor-Kommandos (Bremsdruck je Rad, Gas)
     FVehicleSim             // Step(dt, Packet, ChassisKinematics, WheelContacts[4]) -> ChassisForces + neuer State
   Unreal/
-    UApexVehicleComponent   // Adapter: Contacts per Trace, ruft FVehicleSim, AddForceAtPosition / AddTorque
-    AApexVehiclePawn        // Darstellung: Mesh, Räder, Kamera (liest nur Snapshots, schreibt nie Sim-State)
-    UApexTelemetryWidget    // Debug-HUD: Slip, Fz, Kräfte je Rad, Motor, Gang
+    UGTOVehicleComponent    // Adapter: Contacts per Trace, ruft FVehicleSim, AddForceAtPosition / AddTorque
+    AGTOVehiclePawn         // Darstellung: Mesh, Räder, Kamera (liest nur Snapshots, schreibt nie Sim-State)
+    UGTOTelemetryWidget     // Debug-HUD: Slip, Fz, Kräfte je Rad, Motor, Gang
 ```
 
 Schnittstellenregeln **[Empfehlung]**:
