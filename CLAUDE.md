@@ -2,10 +2,10 @@
 
 ## Build
 
-Engine: Launcher-Build UE 5.8 unter `C:\Program Files\Epic Games\UE_5.8`. Bauen (PowerShell):
+Engine: Launcher-Build UE 5.8 unter `C:\Program Files\Epic Games\UE_5.8`. Bauen (PowerShell, im Repo-Root):
 
 ```
-& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" GTOEditor Win64 Development "-Project=C:\Users\ben_h\Documents\Unreal Projects\GTO\GTO.uproject" -WaitMutex
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" GTOEditor Win64 Development "-Project=$PWD\GTO.uproject" -WaitMutex
 ```
 
 Der Editor muss dafür geschlossen sein (Live Coding sperrt den Build). Vorher fragen, bevor der Editor geschlossen wird.
