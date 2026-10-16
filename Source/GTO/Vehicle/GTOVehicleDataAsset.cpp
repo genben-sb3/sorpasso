@@ -5,6 +5,33 @@
 
 namespace
 {
+	FGTOTireCurveParams ToCurveParams(const FGTOTireCurveSettings& Settings)
+	{
+		FGTOTireCurveParams Curve;
+		Curve.PeakFriction = Settings.PeakFriction;
+		Curve.LoadSensitivity = Settings.LoadSensitivity;
+		Curve.PeakSlip = Settings.PeakSlip;
+		Curve.PeakSlipLoadSensitivity = Settings.PeakSlipLoadSensitivity;
+		Curve.Shape = Settings.Shape;
+		Curve.Curvature = Settings.Curvature;
+		Curve.CombinedSlipStiffness = Settings.CombinedSlipStiffness;
+		return Curve;
+	}
+
+	FGTOTireParams ToTireParams(const FGTOTireSettings& Settings)
+	{
+		FGTOTireParams Tire;
+		Tire.NominalLoad = Settings.NominalLoad;
+		Tire.Longitudinal = ToCurveParams(Settings.Longitudinal);
+		Tire.Lateral = ToCurveParams(Settings.Lateral);
+		Tire.RelaxationLength = Settings.RelaxationLength;
+		Tire.RelaxationMinSpeed = Settings.RelaxationMinSpeed;
+		Tire.RelaxationFullSpeed = Settings.RelaxationFullSpeed;
+		Tire.SlipMinSpeed = Settings.SlipMinSpeed;
+		Tire.RollingResistance = Settings.RollingResistance;
+		return Tire;
+	}
+
 	FGTOAxleParams ToAxleParams(const FGTOAxleSettings& Settings)
 	{
 		FGTOAxleParams Axle;
@@ -19,6 +46,10 @@ namespace
 		Axle.Suspension.BumpStopCompression = Settings.Suspension.BumpStopCompression;
 		Axle.Suspension.BumpStopRate = Settings.Suspension.BumpStopRate;
 		Axle.Suspension.AntiRollRate = Settings.Suspension.AntiRollRate;
+		Axle.WheelInertia = Settings.WheelInertia;
+		Axle.MaxSteerAngle = Settings.MaxSteerAngle;
+		Axle.BrakeTorque = Settings.BrakeTorque;
+		Axle.Tire = ToTireParams(Settings.Tire);
 		return Axle;
 	}
 }
@@ -32,9 +63,26 @@ UGTOVehicleDataAsset::UGTOVehicleDataAsset()
 	FGTOAxleSettings Axle;
 	Axle.TrackWidth = 1.61;
 	Axle.WheelRadius = 0.393;
+	Axle.WheelInertia = 1.5;
 	Axle.Suspension.MaxLength = 0.20;
 	Axle.Suspension.BumpStopCompression = 0.11;
 	Axle.Suspension.BumpStopRate = 5.0e5;
+
+	// Road tyre at the spec's starting values: peak friction about 1.1, peak slip 0.1 and about 7°, relaxation length
+	// 0.4 m. Laterally a low C and negative E keep most of the grip past the peak, so a drift can be held.
+	FGTOTireSettings& Tire = Axle.Tire;
+	Tire.NominalLoad = 3200.0;
+	Tire.Longitudinal.PeakFriction = 1.1;
+	Tire.Longitudinal.LoadSensitivity = -0.15;
+	Tire.Longitudinal.PeakSlip = 0.1;
+	Tire.Longitudinal.Shape = 1.65;
+	Tire.Longitudinal.Curvature = 0.5;
+	Tire.Lateral.PeakFriction = 1.05;
+	Tire.Lateral.LoadSensitivity = -0.15;
+	Tire.Lateral.PeakSlip = 0.12;
+	Tire.Lateral.PeakSlipLoadSensitivity = 0.25;
+	Tire.Lateral.Shape = 1.3;
+	Tire.Lateral.Curvature = -0.5;
 
 	Front = Axle;
 	Front.PositionX = 1.453;
@@ -43,6 +91,8 @@ UGTOVehicleDataAsset::UGTOVehicleDataAsset()
 	Front.Suspension.BumpDamping = 2500.0;
 	Front.Suspension.ReboundDamping = 4500.0;
 	Front.Suspension.AntiRollRate = 20000.0;
+	Front.MaxSteerAngle = 0.5;
+	Front.BrakeTorque = 2500.0;
 
 	Rear = Axle;
 	Rear.PositionX = -1.189;
@@ -51,6 +101,7 @@ UGTOVehicleDataAsset::UGTOVehicleDataAsset()
 	Rear.Suspension.BumpDamping = 2800.0;
 	Rear.Suspension.ReboundDamping = 5000.0;
 	Rear.Suspension.AntiRollRate = 10000.0;
+	Rear.BrakeTorque = 1200.0; // under hard braking the fronts lock first, which keeps the car straight
 
 	// The body mesh origin sits on the ground between the axles; BodyMeshOffset puts its wheel arches over the wheels.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Game/Vehicles/SportsCar/SM_SportsCar.SM_SportsCar"));
@@ -68,5 +119,8 @@ FGTOVehicleParams UGTOVehicleDataAsset::ToParams() const
 	Params.Inertia = Inertia;
 	Params.Front = ToAxleParams(Front);
 	Params.Rear = ToAxleParams(Rear);
+	Params.Drive.MaxTorque = DriveTorque;
+	Params.Drive.MaxPower = DrivePower;
+	Params.HandbrakeTorque = HandbrakeTorque;
 	return Params;
 }

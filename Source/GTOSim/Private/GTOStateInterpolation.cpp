@@ -9,8 +9,17 @@ FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVeh
 	Result.Chassis.AngularVelocity = FMath::Lerp(From.Chassis.AngularVelocity, To.Chassis.AngularVelocity, Alpha);
 	for (int32 Index = 0; Index < GTONumWheels; ++Index)
 	{
-		Result.Wheels[Index].Compression = FMath::Lerp(From.Wheels[Index].Compression, To.Wheels[Index].Compression, Alpha);
-		Result.Wheels[Index].Load = FMath::Lerp(From.Wheels[Index].Load, To.Wheels[Index].Load, Alpha);
+		const FGTOWheelState& A = From.Wheels[Index];
+		const FGTOWheelState& B = To.Wheels[Index];
+		FGTOWheelState& Wheel = Result.Wheels[Index];
+		Wheel.Compression = FMath::Lerp(A.Compression, B.Compression, Alpha);
+		Wheel.Load = FMath::Lerp(A.Load, B.Load, Alpha);
+		Wheel.AngularVelocity = FMath::Lerp(A.AngularVelocity, B.AngularVelocity, Alpha);
+		Wheel.SteerAngle = FMath::Lerp(A.SteerAngle, B.SteerAngle, Alpha);
+		Wheel.SlipRatio = FMath::Lerp(A.SlipRatio, B.SlipRatio, Alpha);
+		Wheel.SlipAngle = FMath::Lerp(A.SlipAngle, B.SlipAngle, Alpha);
+		Wheel.LongitudinalForce = FMath::Lerp(A.LongitudinalForce, B.LongitudinalForce, Alpha);
+		Wheel.LateralForce = FMath::Lerp(A.LateralForce, B.LateralForce, Alpha);
 	}
 	return Result;
 }

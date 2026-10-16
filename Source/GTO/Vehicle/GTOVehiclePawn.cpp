@@ -13,6 +13,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "InputModifiers.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Vehicle/GTOUnits.h"
@@ -31,6 +32,19 @@ namespace
 		UInputAction* Action = NewObject<UInputAction>(Outer, Name);
 		Action->ValueType = EInputActionValueType::Boolean;
 		return Action;
+	}
+
+	UInputAction* MakeAxisAction(UObject* Outer, FName Name, EInputActionAccumulationBehavior Accumulation = EInputActionAccumulationBehavior::TakeHighestAbsoluteValue)
+	{
+		UInputAction* Action = NewObject<UInputAction>(Outer, Name);
+		Action->ValueType = EInputActionValueType::Axis1D;
+		Action->AccumulationBehavior = Accumulation;
+		return Action;
+	}
+
+	void MapNegated(UInputMappingContext* Mapping, const UInputAction* Action, const FKey& Key)
+	{
+		Mapping->MapKey(Action, Key).Modifiers.Add(NewObject<UInputModifierNegate>(Mapping));
 	}
 }
 
@@ -126,6 +140,7 @@ void AGTOVehiclePawn::ResetToStart()
 	Chassis->SetPhysicsAngularVelocityInRadians(FVector::ZeroVector);
 	Chassis->SetMassOverrideInKg(NAME_None, Params.Mass, true);
 	Sim->Restart(Chassis, Params);
+	WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 	UpdateDisplay();
 }
 
@@ -152,7 +167,14 @@ void AGTOVehiclePawn::ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data)
 void AGTOVehiclePawn::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	Sim->QueueInput(FGTOInputPacket()); // neutral controls until driving input exists
+	LastInput = ScriptedInput ? *ScriptedInput : ReadDriverInput();
+	Sim->QueueInput(LastInput);
+
+	const FGTOVehicleState Shown = Sim->GetDisplayState();
+	for (int32 Index = 0; Index < GTONumWheels; ++Index)
+	{
+		WheelSpin[Index] = FMath::Fmod(WheelSpin[Index] + Shown.Wheels[Index].AngularVelocity * DeltaSeconds, UE_DOUBLE_TWO_PI);
+	}
 	UpdateDisplay();
 }
 
@@ -166,9 +188,14 @@ void AGTOVehiclePawn::UpdateDisplay()
 	{
 		const FVector Centre = Params.WheelCentreLocal(static_cast<EGTOWheel>(Index), Shown.Wheels[Index].Compression) * CmPerM;
 
+		// Steered about the vertical, spun about the axle. The right wheels are the left mesh turned around, so for them
+		// rolling forward is a positive pitch in mesh space.
+		const bool bLeft = GTOIsLeft(static_cast<EGTOWheel>(Index));
+		const FRotator Rotation(FMath::RadiansToDegrees(WheelSpin[Index]) * (bLeft ? -1.0 : 1.0), FMath::RadiansToDegrees(Shown.Wheels[Index].SteerAngle) + (bLeft ? 0.0 : 180.0), 0.0);
+
 		UStaticMeshComponent* WheelMesh = WheelMeshes[Index];
 		const FVector MeshCentre = WheelMesh->GetStaticMesh() ? WheelMesh->GetStaticMesh()->GetBounds().Origin : FVector::ZeroVector;
-		WheelMesh->SetRelativeLocation(Centre - WheelMesh->GetRelativeRotation().RotateVector(MeshCentre));
+		WheelMesh->SetRelativeLocationAndRotation(Centre - Rotation.RotateVector(MeshCentre), Rotation);
 	}
 }
 
@@ -176,12 +203,33 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	// Created in code for now; they move to assets once the full key layout for driving arrives.
+	// Default layout, created in code so it stays readable and reviewable. Keyboard and gamepad are mapped side by side
+	// and both work at any time; for now their values go straight into the input packet.
 	UInputAction* ResetAction = MakeButtonAction(this, TEXT("IA_Reset"));
 	UInputAction* TelemetryAction = MakeButtonAction(this, TEXT("IA_ToggleTelemetry"));
 	UInputAction* QuitAction = MakeButtonAction(this, TEXT("IA_Quit"));
+	SteerAction = MakeAxisAction(this, TEXT("IA_Steer"), EInputActionAccumulationBehavior::Cumulative); // left and right keys cancel out
+	ThrottleAction = MakeAxisAction(this, TEXT("IA_Throttle"));
+	BrakeAction = MakeAxisAction(this, TEXT("IA_Brake"));
+	HandbrakeAction = MakeAxisAction(this, TEXT("IA_Handbrake"));
 
 	InputMapping = NewObject<UInputMappingContext>(this, TEXT("IMC_Vehicle"));
+	InputMapping->MapKey(SteerAction, EKeys::D);
+	InputMapping->MapKey(SteerAction, EKeys::Right);
+	MapNegated(InputMapping, SteerAction, EKeys::A);
+	MapNegated(InputMapping, SteerAction, EKeys::Left);
+	UInputModifierDeadZone* StickDeadZone = NewObject<UInputModifierDeadZone>(InputMapping);
+	StickDeadZone->Type = EDeadZoneType::Axial;
+	StickDeadZone->LowerThreshold = 0.1f; // a resting stick may drift a little
+	InputMapping->MapKey(SteerAction, EKeys::Gamepad_LeftX).Modifiers.Add(StickDeadZone);
+	InputMapping->MapKey(ThrottleAction, EKeys::W);
+	InputMapping->MapKey(ThrottleAction, EKeys::Up);
+	InputMapping->MapKey(ThrottleAction, EKeys::Gamepad_RightTriggerAxis);
+	InputMapping->MapKey(BrakeAction, EKeys::S);
+	InputMapping->MapKey(BrakeAction, EKeys::Down);
+	InputMapping->MapKey(BrakeAction, EKeys::Gamepad_LeftTriggerAxis);
+	InputMapping->MapKey(HandbrakeAction, EKeys::SpaceBar);
+	InputMapping->MapKey(HandbrakeAction, EKeys::Gamepad_FaceButton_Bottom);
 	InputMapping->MapKey(ResetAction, EKeys::R);
 	InputMapping->MapKey(ResetAction, EKeys::Gamepad_FaceButton_Top);
 	InputMapping->MapKey(TelemetryAction, EKeys::T);
@@ -193,6 +241,10 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	Input->BindAction(ResetAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ResetToStart);
 	Input->BindAction(TelemetryAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleTelemetry);
 	Input->BindAction(QuitAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::Quit);
+	for (const UInputAction* Action : { SteerAction.Get(), ThrottleAction.Get(), BrakeAction.Get(), HandbrakeAction.Get() })
+	{
+		Input->BindActionValue(Action);
+	}
 
 	if (const APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
@@ -201,6 +253,22 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 			Subsystem->AddMappingContext(InputMapping, 0);
 		}
 	}
+}
+
+FGTOInputPacket AGTOVehiclePawn::ReadDriverInput() const
+{
+	FGTOInputPacket Packet;
+	const UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent);
+	if (!Input || !SteerAction)
+	{
+		return Packet; // not driven by a player
+	}
+	const auto Value = [Input](const UInputAction* Action) { return Input->GetBoundActionValue(Action).Get<float>(); };
+	Packet.Steer = FMath::Clamp(Value(SteerAction), -1.f, 1.f);
+	Packet.Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
+	Packet.Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
+	Packet.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
+	return Packet;
 }
 
 void AGTOVehiclePawn::ToggleTelemetry()

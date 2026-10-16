@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "GTOVehicleTypes.h"
 #include "GTOVehiclePawn.generated.h"
 
 class UBoxComponent;
@@ -35,6 +36,12 @@ public:
 
 	const UGTOVehicleSimComponent* GetSim() const { return Sim; }
 
+	/** Drives the car with Packet instead of the player's controls, e.g. in tests; unset hands control back. */
+	void SetScriptedInput(const TOptional<FGTOInputPacket>& Packet) { ScriptedInput = Packet; }
+
+	/** Controls sent to the sim on the last frame. */
+	const FGTOInputPacket& GetLastInput() const { return LastInput; }
+
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -43,6 +50,7 @@ private:
 	const UGTOVehicleDataAsset& GetVehicleData() const;
 	void ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data);
 	void UpdateDisplay();
+	FGTOInputPacket ReadDriverInput() const;
 	void ToggleTelemetry();
 	void Quit();
 
@@ -74,5 +82,22 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> InputMapping;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> SteerAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> ThrottleAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> BrakeAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> HandbrakeAction;
+
 	FTransform StartTransform;
+	TOptional<FGTOInputPacket> ScriptedInput;
+	FGTOInputPacket LastInput;
+
+	/** Display only: how far each wheel has turned, in EGTOWheel order (rad). */
+	TStaticArray<double, GTONumWheels> WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 };

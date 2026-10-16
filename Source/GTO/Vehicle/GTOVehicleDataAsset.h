@@ -42,6 +42,78 @@ struct FGTOSuspensionSettings
 	double AntiRollRate = 0.0;
 };
 
+/** One direction of the Magic Formula tyre. See FGTOTireCurveParams. */
+USTRUCT(BlueprintType)
+struct FGTOTireCurveSettings
+{
+	GENERATED_BODY()
+
+	/** Peak force / load at nominal load (D) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double PeakFriction = 1.0;
+
+	/** Exponent of the peak friction over relative load, between −1 and 0: more load, relatively less grip */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = -0.99, ClampMax = 0))
+	double LoadSensitivity = 0.0;
+
+	/** Slip at the peak at nominal load: slip ratio longitudinally, rad laterally (0.12 rad = 6.9 deg) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0.001))
+	double PeakSlip = 0.1;
+
+	/** Relative change of the peak slip per relative load change */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire")
+	double PeakSlipLoadSensitivity = 0.0;
+
+	/** C, between 1 and 2: lower keeps more force when sliding */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 1.01, ClampMax = 1.99))
+	double Shape = 1.5;
+
+	/** E, at most 1: higher makes the peak flatter and the rise steeper */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMax = 1))
+	double Curvature = 0.0;
+
+	/** How fast this force fades as the other direction slips; 1 puts both peaks together on the friction circle */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double CombinedSlipStiffness = 1.0;
+};
+
+/** Tyre of one axle. See FGTOTireParams. */
+USTRUCT(BlueprintType)
+struct FGTOTireSettings
+{
+	GENERATED_BODY()
+
+	/** N, the load the curves are given for */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 1))
+	double NominalLoad = 4000.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire")
+	FGTOTireCurveSettings Longitudinal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire")
+	FGTOTireCurveSettings Lateral;
+
+	/** m, rolling distance over which the slip angle builds up */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double RelaxationLength = 0.4;
+
+	/** m/s; below, the slip angle acts at once, which keeps standstill and parking damped */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double RelaxationMinSpeed = 5.0;
+
+	/** m/s; from here on the slip angle lags fully, blended in from RelaxationMinSpeed */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double RelaxationFullSpeed = 10.0;
+
+	/** m/s; the slip denominator saturates smoothly towards 2/3 of it at standstill (VXLOW) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double SlipMinSpeed = 2.0;
+
+	/** Rolling resistance force / load */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tire", meta = (ClampMin = 0))
+	double RollingResistance = 0.015;
+};
+
 /** Geometry and suspension of one axle, in SI units relative to the centre of mass. See FGTOAxleParams. */
 USTRUCT(BlueprintType)
 struct FGTOAxleSettings
@@ -64,8 +136,23 @@ struct FGTOAxleSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle", meta = (ClampMin = 0))
 	double WheelRadius = 0.0;
 
+	/** kg·m², per wheel about its axle */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle", meta = (ClampMin = 0.01))
+	double WheelInertia = 1.0;
+
+	/** rad, road wheel angle at full steering input; 0 for an axle that does not steer */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle", meta = (ClampMin = 0))
+	double MaxSteerAngle = 0.0;
+
+	/** N·m per wheel at full brake */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle", meta = (ClampMin = 0))
+	double BrakeTorque = 0.0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle")
 	FGTOSuspensionSettings Suspension;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axle")
+	FGTOTireSettings Tire;
 };
 
 /**
@@ -102,6 +189,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axles")
 	FGTOAxleSettings Rear;
+
+	/** N·m at full throttle on both rear wheels together. Stand-in until the drivetrain arrives. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Drive", meta = (ClampMin = 0))
+	double DriveTorque = 4000.0;
+
+	/** W, caps the drive torque at wheel speed */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Drive", meta = (ClampMin = 0))
+	double DrivePower = 210000.0;
+
+	/** N·m per rear wheel at full handbrake; the handbrake acts on the rear wheels only */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Brakes", meta = (ClampMin = 0))
+	double HandbrakeTorque = 2000.0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display")
 	TObjectPtr<UStaticMesh> BodyMesh;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GTOTireModel.h"
 #include "GTOVehicleTypes.h"
 
 /**
@@ -23,7 +24,18 @@ struct FGTOAxleParams
 	double TrackWidth = 0.0;  // m
 	double MountHeight = 0.0; // m, strut mount above the centre of mass
 	double WheelRadius = 0.0; // m
+	double WheelInertia = 1.0;    // kg·m², per wheel about its axle
+	double MaxSteerAngle = 0.0;   // rad, road wheel angle at full steering input
+	double BrakeTorque = 0.0;     // N·m per wheel at full brake
 	FGTOSuspensionParams Suspension;
+	FGTOTireParams Tire;
+};
+
+/** Stand-in for the drivetrain: torque straight onto the rear wheels, shared equally, limited by engine power. */
+struct FGTODriveParams
+{
+	double MaxTorque = 0.0; // N·m at full throttle, both rear wheels together
+	double MaxPower = 0.0;  // W, caps the torque at wheel speed: torque · ω <= power
 };
 
 /** Plain vehicle data. Filled from a data asset by the Unreal adapter, or directly by tests. */
@@ -33,6 +45,8 @@ struct FGTOVehicleParams
 	FVector Inertia = FVector::OneVector; // kg·m², principal moments about the centre of mass in body axes
 	FGTOAxleParams Front;
 	FGTOAxleParams Rear;
+	FGTODriveParams Drive;
+	double HandbrakeTorque = 0.0; // N·m per rear wheel at full handbrake; the handbrake acts on the rear wheels only
 
 	const FGTOAxleParams& Axle(EGTOWheel Wheel) const { return GTOIsFront(Wheel) ? Front : Rear; }
 

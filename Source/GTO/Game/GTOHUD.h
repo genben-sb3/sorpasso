@@ -4,7 +4,7 @@
 #include "GameFramework/HUD.h"
 #include "GTOHUD.generated.h"
 
-/** Developer telemetry drawn on the canvas: wheel loads, suspension travel, physics steps per second. */
+/** Developer telemetry drawn on the canvas: controls, and per wheel load, travel, spin, slip and tyre forces. */
 UCLASS()
 class GTO_API AGTOHUD : public AHUD
 {

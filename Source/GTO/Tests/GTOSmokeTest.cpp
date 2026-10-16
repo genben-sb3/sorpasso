@@ -15,7 +15,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 // In-engine smoke tests on the flat test map. They check only that adapter and Chaos work together (async tick,
-// wheel casts, forces), watching the car through its sim snapshots, with rough tolerances.
+// wheel casts, forces, input packets), watching the car through its sim snapshots, with rough tolerances.
 namespace
 {
 	const TCHAR* FlatTestMap = TEXT("/Game/Maps/FlatTest");
@@ -212,6 +212,63 @@ namespace
 		bool bReset = false;
 	};
 
+	/** Settled car → throttle → full brake: drives off straight ahead and stops again. */
+	class FDrivesAndStopsRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		static constexpr double SettleSeconds = 2.0;
+		static constexpr double DriveSeconds = 3.0;
+		static constexpr double BrakeSeconds = 5.0;
+
+		virtual bool Step(uint32 Ticks) override
+		{
+			FGTOInputPacket Packet;
+			const FGTOChassisKinematics Chassis = Sim()->GetLatestState().Chassis;
+			if (Ticks < TicksFor(SettleSeconds))
+			{
+				SettledAt = Chassis.Position;
+			}
+			else if (Ticks < TicksFor(SettleSeconds + DriveSeconds))
+			{
+				Packet.Throttle = 0.6f;
+				TopSpeed = FMath::Max(TopSpeed, Chassis.LinearVelocity.Size());
+			}
+			else if (Ticks < TicksFor(SettleSeconds + DriveSeconds + BrakeSeconds))
+			{
+				Packet.Brake = 1.f;
+			}
+			else
+			{
+				Vehicle->SetScriptedInput({});
+				Check(Chassis);
+				return true;
+			}
+			Vehicle->SetScriptedInput(Packet);
+			return false;
+		}
+
+		void Check(const FGTOChassisKinematics& Chassis)
+		{
+			const FVector Heading = Start.GetRotation().GetForwardVector();
+			const FVector Travel = Chassis.Position - SettledAt; // m
+			const double Ahead = FVector::DotProduct(Travel, Heading);
+			const double Aside = FVector2D(Travel - Heading * Ahead).Size();
+			const double YawError = FMath::Abs(FRotator::NormalizeAxis(Chassis.Orientation.Rotator().Yaw - Start.Rotator().Yaw));
+
+			Test.AddInfo(FString::Printf(TEXT("top speed %.2f m/s, stopped %.2f m ahead and %.3f m aside, heading off by %.2f deg, speed %g m/s"), TopSpeed, Ahead, Aside, YawError, Chassis.LinearVelocity.Size()));
+			Test.TestTrue(FString::Printf(TEXT("drives off (%.2f m/s)"), TopSpeed), TopSpeed > 5.0);
+			Test.TestTrue(FString::Printf(TEXT("ends up ahead of where it started (%.2f m)"), Ahead), Ahead > 5.0);
+			Test.TestTrue(FString::Printf(TEXT("goes straight (%.3f m aside, %.2f deg)"), Aside, YawError), Aside < 0.5 && YawError < 2.0);
+			Test.TestTrue(FString::Printf(TEXT("stops (%g m/s)"), Chassis.LinearVelocity.Size()), Chassis.LinearVelocity.Size() < 0.05);
+		}
+
+		FVector SettledAt = FVector::ZeroVector;
+		double TopSpeed = 0.0;
+	};
+
 	template <typename RunType>
 	void PlayFlatTestMap(FAutomationTestBase& Test)
 	{
@@ -240,6 +297,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOCarStandsStillTest, "GTO.Smoke.CarStandsSti
 bool FGTOCarStandsStillTest::RunTest(const FString& Parameters)
 {
 	PlayFlatTestMap<FCarStandsStillRun>(*this);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTODrivesAndStopsTest, "GTO.Smoke.DrivesAndStops", SmokeTestFlags)
+
+bool FGTODrivesAndStopsTest::RunTest(const FString& Parameters)
+{
+	PlayFlatTestMap<FDrivesAndStopsRun>(*this);
 	return true;
 }
 

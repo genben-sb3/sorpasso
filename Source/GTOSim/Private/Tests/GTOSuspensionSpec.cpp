@@ -42,8 +42,12 @@ void FGTOSuspensionSpec::Define()
 			TestTrue(TEXT("chassis stands on its wheels"), Harness.Chassis().Position.Z > Ground.Height + 0.3);
 			TestTrue(FString::Printf(TEXT("max speed after 2 s (%g m/s) < 1 mm/s"), MaxSpeed), MaxSpeed < 1.0e-3);
 			TestTrue(FString::Printf(TEXT("max angular speed after 2 s (%g rad/s) < 1 mrad/s"), MaxAngularSpeed), MaxAngularSpeed < 1.0e-3);
-			TestTrue(TEXT("no movement after 2 s"), FVector::Dist(SettledPosition, Harness.Chassis().Position) < 1.0e-3);
-			TestTrue(TEXT("no horizontal drift"), FVector2D(Harness.Chassis().Position - Start.Position).Size() < 1.0e-3);
+			const double Moved = FVector::Dist(SettledPosition, Harness.Chassis().Position);
+			const double Drift = FVector2D(Harness.Chassis().Position - Start.Position).Size();
+			TestTrue(FString::Printf(TEXT("no movement after 2 s (%g m)"), Moved), Moved < 1.0e-3);
+			// The gripping tyres hold the contact patches while the tilt settles, so the centre of mass ends up over them:
+			// shifted by about its height times the tilt (0.45 m · 1° ≈ 8 mm), but no further.
+			TestTrue(FString::Printf(TEXT("no horizontal drift beyond settling the tilt (%g m)"), Drift), Drift < 0.015);
 		});
 
 		It("carries the static axle loads where the centre of mass sits", [this]()

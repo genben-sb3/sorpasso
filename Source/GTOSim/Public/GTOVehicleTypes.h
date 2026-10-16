@@ -48,7 +48,7 @@ struct FGTOWheelContact
 	bool bHit = false;
 	FVector Point = FVector::ZeroVector;
 	FVector Normal = FVector::UpVector;
-	double Friction = 1.0;
+	double Friction = 1.0; // grip of the surface, 1 for dry asphalt
 };
 
 using FGTOWheelContacts = TStaticArray<FGTOWheelContact, GTONumWheels>;

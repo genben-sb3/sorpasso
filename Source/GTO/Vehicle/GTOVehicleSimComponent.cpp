@@ -159,6 +159,8 @@ FGTOWheelContacts UGTOVehicleSimComponent::CastWheels(const FGTOChassisKinematic
 
 		FGTOWheelContact& Contact = Contacts[Index];
 		Contact.bHit = true;
+		// The surface's grip is its physical material's friction: 1 for dry asphalt (PM_Asphalt). Surfaces without a
+		// material of their own report Unreal's default material, friction 0.7; no material at all counts as asphalt.
 		Contact.Friction = Hit.PhysMaterial.IsValid() ? Hit.PhysMaterial->Friction : 1.0;
 		if (Hit.bStartPenetrating)
 		{
