@@ -10,6 +10,18 @@ Engine: Launcher-Build UE 5.8 unter `C:\Program Files\Epic Games\UE_5.8`. Bauen 
 
 Der Editor muss dafür geschlossen sein (Live Coding sperrt den Build). Vorher fragen, bevor der Editor geschlossen wird.
 
+## Tests
+
+Unreal Automation Tests im Namensraum `GTO.` (Sim-Kern: `GTO.Sim.`), headless nach dem Build (PowerShell, im Repo-Root):
+
+```
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\GTO.uproject" -ExecCmds="Automation RunTests GTO.;Quit" -unattended -nullrhi -nosplash -nosound -nopause -stdout -FullStdOutLogOutput
+```
+
+Exit-Code 0 heißt alles grün, sonst 255. Pro Test steht im Log eine Zeile `Test Completed. Result={Success|Fail}`, Fehlschläge zusätzlich als `LogAutomationController: Error:`. Für einen Teil der Tests den Filter enger fassen, z. B. `GTO.Sim.Suspension`.
+
+Der Sim-Kern (`Source/GTOSim`) rechnet in SI-Einheiten mit Unreal-Achsen (X vorn, Y rechts, Z oben) und hängt nur von `Core` ab. Szenarien über viele Ticks laufen im Headless-Harness (`GTOHeadlessHarness.h`).
+
 ## Agent skills
 
 ### Issue tracker

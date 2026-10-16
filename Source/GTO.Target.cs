@@ -11,5 +11,6 @@ public class GTOTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("GTO");
+		ExtraModuleNames.Add("GTOSim");
 	}
 }
