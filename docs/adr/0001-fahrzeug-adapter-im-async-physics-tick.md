@@ -30,6 +30,8 @@ Nicht geklärt hat der Spike, ob über 8 Substeps gemittelte Kräfte das Chassis
 
 **Nachtrag aus #4: Gemittelte Kräfte genügen.** Der Adapter gibt die über 8 Substeps gemittelten Kräfte einmal pro Chaos-Schritt auf den Körper; Impulse pro Substep sind nicht nötig. Im Headless-Harness (`GTO.Sim.Substepping`, gleicher Ablauf wie im Adapter) kommt das Auto ohne Wippen zur Ruhe, trägt die statischen Achslasten auf 0,5 % genau und weicht beim Einfedern höchstens 2 mm von einem durchgehend mit 960 Hz gerechneten Lauf ab; auch den Fall aus 30 cm fangen die Bump-Stops stabil. In Unreal mit echtem Chaos (`GTO.Smoke.CarStandsStill`) steht das Auto nach 3 s mit Restgeschwindigkeiten um 1e-8 m/s, Achslasten 45,0 : 55,0.
 
+**Nachtrag aus #4: Schnappschüsse tragen die Chaos-Pose.** Der Schnappschuss eines Schritts entsteht erst zu Beginn des nächsten Async-Ticks: Radzustände aus dem Sim-Kern, Chassis so, wie Chaos es tatsächlich bewegt hat (Kollisionen eingeschlossen), nicht die lokal vorhergesagte Pose der Substeps. Die Darstellung liegt dadurch einen Schritt (8,3 ms) weiter zurück. Startet der Rad-Cast bereits im Boden (harte Landung), gilt das als Kontakt weit jenseits des Bump-Stops statt als Rad in der Luft.
+
 ## Konsequenzen
 
 - **Projekteinstellungen:** `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=1/120`, `MaxPhysicsDeltaTime=0.1`. Unter 10 FPS läuft das Spiel bewusst langsamer statt in eine Nachhol-Spirale zu geraten, weil Nachhol-Schritte ebenfalls Game-Thread-Zeit kosten.

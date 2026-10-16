@@ -2,6 +2,7 @@
 #include "Tests/AutomationCommon.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
+#include "GTOHeadlessHarness.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "Vehicle/GTOVehiclePawn.h"
 #include "Vehicle/GTOUnits.h"
@@ -20,6 +21,26 @@ namespace
 	const TCHAR* FlatTestMap = TEXT("/Game/Maps/FlatTest");
 
 	constexpr double TimeoutSeconds = 60.0;
+
+	/** Static wheel loads of the car on flat ground, settled in the headless harness stepped like the adapter. */
+	TStaticArray<double, GTONumWheels> HarnessStaticLoads(const FGTOVehicleParams& Params, double FixedStep, int32 NumSubsteps)
+	{
+		const FGTOFlatGround Ground;
+		FGTOChassisKinematics Start;
+		Start.Position.Z = Ground.Height + Params.FullDroopHeight();
+		FGTOHeadlessHarness Harness(Params, Ground, Start, FixedStep, NumSubsteps);
+		for (int32 Tick = 0; Tick < FMath::RoundToInt32(5.0 / FixedStep); ++Tick)
+		{
+			Harness.Tick();
+		}
+
+		TStaticArray<double, GTONumWheels> Loads;
+		for (int32 Index = 0; Index < GTONumWheels; ++Index)
+		{
+			Loads[Index] = Harness.State().Wheels[Index].Load;
+		}
+		return Loads;
+	}
 
 	/** Finds the player's car once the map plays and measures time in sim ticks. Update() returns true when done. */
 	class FSmokeRun
@@ -115,24 +136,25 @@ namespace
 		void Check(const FGTOVehicleState& State)
 		{
 			const FGTOVehicleParams Params = Sim()->GetParams();
+			const double FixedStep = UPhysicsSettings::Get()->AsyncFixedTimeStepSize;
+			const TStaticArray<double, GTONumWheels> Expected = HarnessStaticLoads(Params, FixedStep, Sim()->NumSubsteps);
 			const double Weight = Params.Mass * Gravity;
-			// Statics: the front axle carries the weight share of the rear axle's distance from the centre of mass.
-			const double FrontWeightShare = -Params.Rear.PositionX / (Params.Front.PositionX - Params.Rear.PositionX);
 			const auto Load = [&State](EGTOWheel Wheel) { return State.Wheels[static_cast<int32>(Wheel)].Load; };
 			const double FrontLoad = Load(EGTOWheel::FrontLeft) + Load(EGTOWheel::FrontRight);
 			const double TotalLoad = FrontLoad + Load(EGTOWheel::RearLeft) + Load(EGTOWheel::RearRight);
 
-			Test.AddInfo(FString::Printf(TEXT("loads FL %.0f FR %.0f RL %.0f RR %.0f N, weight %.0f N, front share %.4f, max speed %g m/s, max angular speed %g rad/s, height %.4f m, %.1f physics steps/s"),
+			Test.AddInfo(FString::Printf(TEXT("loads FL %.0f FR %.0f RL %.0f RR %.0f N (harness %.0f %.0f %.0f %.0f N), weight %.0f N, front share %.4f, max speed %g m/s, max angular speed %g rad/s, height %.4f m, %.1f physics steps/s"),
 				Load(EGTOWheel::FrontLeft), Load(EGTOWheel::FrontRight), Load(EGTOWheel::RearLeft), Load(EGTOWheel::RearRight),
+				Expected[0], Expected[1], Expected[2], Expected[3],
 				Weight, FrontLoad / TotalLoad, MaxSpeed, MaxAngularSpeed, State.Chassis.Position.Z, Sim()->GetTicksPerSecond()));
 			for (int32 Index = 0; Index < GTONumWheels; ++Index)
 			{
-				Test.TestTrue(FString::Printf(TEXT("wheel %d carries load (%g N)"), Index, State.Wheels[Index].Load), State.Wheels[Index].Load > 0.0);
+				// 1 % of the weight: Chaos and the harness integrate differently and use slightly different gravity.
+				Test.TestNearlyEqual(FString::Printf(TEXT("wheel %d load matches the harness (N)"), Index), State.Wheels[Index].Load, Expected[Index], 0.01 * Weight);
 			}
-			const double FixedRate = 1.0 / UPhysicsSettings::Get()->AsyncFixedTimeStepSize;
+			const double FixedRate = 1.0 / FixedStep;
 			Test.TestNearlyEqual(TEXT("physics steps per second match the fixed step"), Sim()->GetTicksPerSecond(), FixedRate, 0.05 * FixedRate);
 			Test.TestNearlyEqual(TEXT("wheels carry the weight (N)"), TotalLoad, Weight, 0.03 * Weight);
-			Test.TestNearlyEqual(TEXT("front share of the load"), FrontLoad / TotalLoad, FrontWeightShare, 0.015);
 			Test.TestTrue(FString::Printf(TEXT("max speed in the last second (%g m/s) < 1 cm/s"), MaxSpeed), MaxSpeed < 0.01);
 			Test.TestTrue(FString::Printf(TEXT("max angular speed in the last second (%g rad/s) < 0.01 rad/s"), MaxAngularSpeed), MaxAngularSpeed < 0.01);
 			Test.TestTrue(TEXT("no movement in the last second"), FVector::Dist(MeasureStart, State.Chassis.Position) < 0.01);

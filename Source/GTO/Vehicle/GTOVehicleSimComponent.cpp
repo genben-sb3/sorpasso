@@ -28,6 +28,7 @@ void UGTOVehicleSimComponent::Restart(UPrimitiveComponent* Body, const FGTOVehic
 	State = FGTOVehicleState();
 	State.Chassis.Position = Body->GetComponentLocation() / CmPerM;
 	State.Chassis.Orientation = Body->GetComponentQuat();
+	Latest = State;
 	Display.Reset(State, UPhysicsSettings::Get()->AsyncFixedTimeStepSize);
 	InputQueue.Reset();
 }
@@ -50,7 +51,7 @@ FGTOVehicleParams UGTOVehicleSimComponent::GetParams() const
 FGTOVehicleState UGTOVehicleSimComponent::GetLatestState() const
 {
 	FScopeLock ScopeLock(&Lock);
-	return State;
+	return Latest;
 }
 
 FGTOVehicleState UGTOVehicleSimComponent::GetDisplayState() const
@@ -81,13 +82,19 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	FScopeLock ScopeLock(&Lock);
 	ApplyMassProperties(Handle);
 	const FGTOChassisKinematics Chassis = ReadChassis(Handle);
+
+	// Snapshot of the previous step: its wheels, with the chassis where Chaos actually moved it (collisions included)
+	// rather than where the substeps predicted it.
+	Latest = State;
+	Latest.Chassis = Chassis;
+	Display.Push(Latest);
+
 	const FGTOWheelContacts Contacts = CastWheels(Chassis);
 	const FGTOInputPacket Packet = InputQueue.Pop(SimulatedTicks);
 	const FVector Gravity(0.0, 0.0, GetWorld()->GetGravityZ() / CmPerM);
 
 	const FGTOStepResult Result = FGTOVehicleSim::StepSubstepped(State, Params, Packet, Contacts, Chassis, Gravity, DeltaTime, NumSubsteps);
 	State = Result.State;
-	Display.Push(State);
 	++SimulatedTicks;
 
 	// Forces through the handle directly: UPhysicsThreadLibrary::AddForce is not callable in 5.8 (ADR 0001).
@@ -142,16 +149,29 @@ FGTOWheelContacts UGTOVehicleSimComponent::CastWheels(const FGTOChassisKinematic
 		const FVector Mount = Params.WheelMountWorld(Wheel, Chassis) * CmPerM;
 
 		// Wheel-sized sphere from one radius above the mount to full droop, so the ground is found even at full compression.
+		const FVector Start = Mount - Down * Radius;
 		FHitResult Hit;
-		const bool bHit = GetWorld()->SweepSingleByChannel(Hit, Mount - Down * Radius, Mount + Down * (Axle.Suspension.MaxLength * CmPerM),
-			FQuat::Identity, WheelTraceChannel, FCollisionShape::MakeSphere(Radius), Query);
-		if (bHit && !Hit.bStartPenetrating)
+		if (!GetWorld()->SweepSingleByChannel(Hit, Start, Mount + Down * (Axle.Suspension.MaxLength * CmPerM),
+			FQuat::Identity, WheelTraceChannel, FCollisionShape::MakeSphere(Radius), Query))
 		{
-			FGTOWheelContact& Contact = Contacts[Index];
-			Contact.bHit = true;
+			continue;
+		}
+
+		FGTOWheelContact& Contact = Contacts[Index];
+		Contact.bHit = true;
+		Contact.Friction = Hit.PhysMaterial.IsValid() ? Hit.PhysMaterial->Friction : 1.0;
+		if (Hit.bStartPenetrating)
+		{
+			// Ground already above the start, e.g. a hard landing on a kerb: no impact point, but the sphere would be pushed
+			// out along Normal by PenetrationDepth, so the ground plane touches the sphere's surface there. The wheel stays
+			// in contact far beyond the bump stop and pushes the body up instead of dropping through.
+			Contact.Normal = Hit.Normal;
+			Contact.Point = (Start - Hit.Normal * (Radius - Hit.PenetrationDepth)) / CmPerM;
+		}
+		else
+		{
 			Contact.Point = Hit.ImpactPoint / CmPerM;
 			Contact.Normal = Hit.ImpactNormal;
-			Contact.Friction = Hit.PhysMaterial.IsValid() ? Hit.PhysMaterial->Friction : 1.0;
 		}
 	}
 	return Contacts;

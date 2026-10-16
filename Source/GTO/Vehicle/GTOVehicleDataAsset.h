@@ -90,6 +90,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chassis")
 	FVector Inertia = FVector(500.0, 2000.0, 2200.0);
 
+	/**
+	 * Half size of the collision box around the centre of mass (cm). Clear of the ground at rest, it only touches
+	 * anything in a crash; mass and inertia above do not depend on it.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chassis", meta = (ClampMin = 1))
+	FVector CollisionExtent = FVector(220.0, 85.0, 25.0);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Axles")
 	FGTOAxleSettings Front;
 

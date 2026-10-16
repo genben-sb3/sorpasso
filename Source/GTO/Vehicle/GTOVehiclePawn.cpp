@@ -43,10 +43,9 @@ AGTOVehiclePawn::AGTOVehiclePawn()
 	static ConstructorHelpers::FObjectFinder<UGTOVehicleDataAsset> DataAsset(TEXT("/Game/Vehicles/SportsCar/DA_SportsCar.DA_SportsCar"));
 	VehicleData = DataAsset.Object;
 
-	// Centred on the centre of mass and clear of the ground at rest; only touches anything in a crash.
-	// Mass and inertia come from the vehicle parameters, not from this shape.
+	// Centred on the centre of mass. Its size comes from the vehicle data; mass and inertia do not depend on it.
 	Chassis = CreateDefaultSubobject<UBoxComponent>(TEXT("Chassis"));
-	Chassis->SetBoxExtent(FVector(220.0, 85.0, 25.0));
+	Chassis->SetBoxExtent(GetVehicleData().CollisionExtent);
 	Chassis->SetCollisionProfileName(UCollisionProfile::PhysicsActor_ProfileName);
 	Chassis->SetSimulatePhysics(true);
 	Chassis->SetLinearDamping(0.f);
@@ -109,9 +108,9 @@ void AGTOVehiclePawn::BeginPlay()
 
 void AGTOVehiclePawn::ResetToStart()
 {
-	const UGTOVehicleDataAsset* Data = VehicleData ? VehicleData.Get() : GetDefault<UGTOVehicleDataAsset>();
-	const FGTOVehicleParams Params = Data->ToParams();
-	ApplyMeshes(*Data);
+	const UGTOVehicleDataAsset& Data = GetVehicleData();
+	const FGTOVehicleParams Params = Data.ToParams();
+	ApplyShapeAndMeshes(Data);
 
 	const FRotator Rotation(0.0, StartTransform.Rotator().Yaw, 0.0);
 	FVector Location = StartTransform.GetLocation();
@@ -130,8 +129,17 @@ void AGTOVehiclePawn::ResetToStart()
 	UpdateDisplay();
 }
 
-void AGTOVehiclePawn::ApplyMeshes(const UGTOVehicleDataAsset& Data)
+const UGTOVehicleDataAsset& AGTOVehiclePawn::GetVehicleData() const
 {
+	return VehicleData ? *VehicleData : *GetDefault<UGTOVehicleDataAsset>();
+}
+
+void AGTOVehiclePawn::ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data)
+{
+	if (!Chassis->GetUnscaledBoxExtent().Equals(Data.CollisionExtent))
+	{
+		Chassis->SetBoxExtent(Data.CollisionExtent); // may recreate the physics body, so only on a change
+	}
 	BodyMesh->SetStaticMesh(Data.BodyMesh);
 	BodyMesh->SetRelativeLocation(Data.BodyMeshOffset);
 	GlassMesh->SetStaticMesh(Data.GlassMesh);
@@ -179,6 +187,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	InputMapping->MapKey(TelemetryAction, EKeys::T);
 	InputMapping->MapKey(TelemetryAction, EKeys::Gamepad_Special_Left);
 	InputMapping->MapKey(QuitAction, EKeys::Escape);
+	InputMapping->MapKey(QuitAction, EKeys::Gamepad_Special_Right);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(PlayerInputComponent);
 	Input->BindAction(ResetAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ResetToStart);

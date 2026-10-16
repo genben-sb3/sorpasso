@@ -40,7 +40,8 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
-	void ApplyMeshes(const UGTOVehicleDataAsset& Data);
+	const UGTOVehicleDataAsset& GetVehicleData() const;
+	void ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data);
 	void UpdateDisplay();
 	void ToggleTelemetry();
 	void Quit();

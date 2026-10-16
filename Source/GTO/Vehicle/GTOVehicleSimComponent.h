@@ -40,9 +40,11 @@ public:
 	void QueueInput(FGTOInputPacket Packet);
 
 	FGTOVehicleParams GetParams() const;
+
+	/** Snapshot after the last completed Chaos step: the chassis as Chaos left it, the wheels as the sim core left them. */
 	FGTOVehicleState GetLatestState() const;
 
-	/** State interpolated between the last two sim ticks for the current frame. */
+	/** Snapshot interpolated between the last two for the current frame. */
 	FGTOVehicleState GetDisplayState() const;
 
 	/** Sim ticks since the component started. */
@@ -67,7 +69,8 @@ private:
 	// Shared between the async physics tick and the game thread.
 	mutable FCriticalSection Lock;
 	FGTOVehicleParams Params;
-	FGTOVehicleState State;
+	FGTOVehicleState State;  // carried from step to step
+	FGTOVehicleState Latest; // see GetLatestState
 	FGTOSnapshotInterpolator Display;
 	uint32 SimulatedTicks = 0;
 
