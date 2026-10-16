@@ -43,8 +43,24 @@ struct FGTOVehicleParams
 		return FVector(A.PositionX, (GTOIsLeft(Wheel) ? -0.5 : 0.5) * A.TrackWidth, A.MountHeight);
 	}
 
+	/** Wheel centre in body space, relative to the centre of mass, for a given suspension compression. */
+	FVector WheelCentreLocal(EGTOWheel Wheel, double Compression) const
+	{
+		return WheelMountLocal(Wheel) - FVector::UpVector * (Axle(Wheel).Suspension.MaxLength - Compression);
+	}
+
 	FVector WheelMountWorld(EGTOWheel Wheel, const FGTOChassisKinematics& Chassis) const
 	{
 		return Chassis.Position + Chassis.Orientation.RotateVector(WheelMountLocal(Wheel));
+	}
+
+	/** Height of the centre of mass above flat ground when the level car hangs on fully extended struts and the lowest wheels just touch. */
+	double FullDroopHeight() const
+	{
+		auto CentreHeight = [](const FGTOAxleParams& Axle)
+		{
+			return Axle.WheelRadius + Axle.Suspension.MaxLength - Axle.MountHeight;
+		};
+		return FMath::Max(CentreHeight(Front), CentreHeight(Rear));
 	}
 };

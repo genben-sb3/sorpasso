@@ -1,85 +1,9 @@
 #include "Misc/AutomationTest.h"
-#include "Algo/AllOf.h"
-#include "Algo/AnyOf.h"
-#include "GTOHeadlessHarness.h"
+#include "GTOSimTestCars.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
-{
-	// Light rear-drive sports car. The centre of mass sits 1.375 m behind the front axle and 1.125 m ahead
-	// of the rear axle, so statics put 1.125 / 2.5 = 45 % of the weight on the front axle.
-	constexpr double FrontWeightShare = 0.45;
-
-	constexpr int32 FrontLeft = static_cast<int32>(EGTOWheel::FrontLeft);
-	constexpr int32 FrontRight = static_cast<int32>(EGTOWheel::FrontRight);
-	constexpr int32 RearLeft = static_cast<int32>(EGTOWheel::RearLeft);
-	constexpr int32 RearRight = static_cast<int32>(EGTOWheel::RearRight);
-
-	using FWheelStates = TStaticArray<FGTOWheelState, GTONumWheels>;
-
-	bool AllWheelsDown(const FWheelStates& Wheels)
-	{
-		return Algo::AllOf(Wheels, [](const FGTOWheelState& Wheel) { return Wheel.Load > 0.0; });
-	}
-
-	bool AnyWheelUp(const FWheelStates& Wheels)
-	{
-		return Algo::AnyOf(Wheels, [](const FGTOWheelState& Wheel) { return Wheel.Load == 0.0; });
-	}
-
-	FGTOVehicleParams MakeSportsCar()
-	{
-		FGTOVehicleParams Params;
-		Params.Mass = 1300.0;
-		Params.Inertia = FVector(500.0, 2000.0, 2200.0);
-
-		FGTOAxleParams Axle;
-		Axle.TrackWidth = 1.55;
-		Axle.MountHeight = 0.12;
-		Axle.WheelRadius = 0.33;
-		Axle.Suspension.MaxLength = 0.35;
-		Axle.Suspension.BumpStopCompression = 0.10;
-		Axle.Suspension.BumpStopRate = 5.0e5;
-
-		Params.Front = Axle;
-		Params.Front.PositionX = 1.375;
-		Params.Front.Suspension.SpringRate = 45000.0;
-		Params.Front.Suspension.BumpDamping = 2500.0;
-		Params.Front.Suspension.ReboundDamping = 4500.0;
-		Params.Front.Suspension.AntiRollRate = 20000.0;
-
-		Params.Rear = Axle;
-		Params.Rear.PositionX = -1.125;
-		Params.Rear.Suspension.SpringRate = 50000.0;
-		Params.Rear.Suspension.BumpDamping = 2800.0;
-		Params.Rear.Suspension.ReboundDamping = 5000.0;
-		Params.Rear.Suspension.AntiRollRate = 10000.0;
-		return Params;
-	}
-
-	// Level chassis, at rest, with the lowest wheel hanging DropHeight above the ground at full droop.
-	FGTOChassisKinematics DroppedAbove(const FGTOVehicleParams& Params, const FGTOFlatGround& Ground, double DropHeight)
-	{
-		auto CentreHeight = [](const FGTOAxleParams& Axle)
-		{
-			return Axle.WheelRadius + Axle.Suspension.MaxLength - Axle.MountHeight;
-		};
-		FGTOChassisKinematics Chassis;
-		Chassis.Position.Z = Ground.Height + DropHeight + FMath::Max(CentreHeight(Params.Front), CentreHeight(Params.Rear));
-		return Chassis;
-	}
-
-	void RunFor(FGTOHeadlessHarness& Harness, double Seconds, TFunctionRef<void()> AfterTick = [] {})
-	{
-		const int32 Ticks = FMath::RoundToInt32(Seconds / Harness.Dt());
-		for (int32 Tick = 0; Tick < Ticks; ++Tick)
-		{
-			Harness.Tick();
-			AfterTick();
-		}
-	}
-}
+using namespace GTOSimTest;
 
 BEGIN_DEFINE_SPEC(FGTOSuspensionSpec, "GTO.Sim.Suspension", EAutomationTestFlags::ProductFilter | EAutomationTestFlags_ApplicationContextMask)
 END_DEFINE_SPEC(FGTOSuspensionSpec)

@@ -28,38 +28,12 @@ FGTOWheelContacts FGTOFlatGround::Contacts(const FGTOVehicleParams& Params, cons
 	return Result;
 }
 
-FGTOChassisKinematics GTOIntegrateRigidBody(
-	const FGTOChassisKinematics& Chassis,
-	double Mass,
-	const FVector& Inertia,
-	const FGTOChassisForces& Forces,
-	const FVector& Gravity,
-	double Dt)
-{
-	FGTOChassisKinematics Result = Chassis;
-
-	Result.LinearVelocity += (Forces.Force / Mass + Gravity) * Dt;
-	Result.Position += Result.LinearVelocity * Dt;
-
-	// Euler's equations in body axes, where the inertia tensor is diagonal.
-	const FVector OmegaBody = Chassis.Orientation.UnrotateVector(Chassis.AngularVelocity);
-	const FVector TorqueBody = Chassis.Orientation.UnrotateVector(Forces.Torque);
-	const FVector AngularAcceleration = (TorqueBody - FVector::CrossProduct(OmegaBody, Inertia * OmegaBody)) / Inertia;
-	Result.AngularVelocity = Chassis.Orientation.RotateVector(OmegaBody + AngularAcceleration * Dt);
-
-	const double Angle = Result.AngularVelocity.Size() * Dt;
-	if (Angle > 0.0)
-	{
-		Result.Orientation = (FQuat(Result.AngularVelocity.GetUnsafeNormal(), Angle) * Chassis.Orientation).GetNormalized();
-	}
-	return Result;
-}
-
-FGTOHeadlessHarness::FGTOHeadlessHarness(const FGTOVehicleParams& InParams, const FGTOFlatGround& InGround, const FGTOChassisKinematics& Start, double InDt)
+FGTOHeadlessHarness::FGTOHeadlessHarness(const FGTOVehicleParams& InParams, const FGTOFlatGround& InGround, const FGTOChassisKinematics& Start, double InDt, int32 InNumSubsteps)
 	: Params(InParams)
 	, Ground(InGround)
 	, Body(Start)
 	, StepDt(InDt)
+	, NumSubsteps(InNumSubsteps)
 {
 	VehicleState.Chassis = Start;
 }
@@ -67,7 +41,8 @@ FGTOHeadlessHarness::FGTOHeadlessHarness(const FGTOVehicleParams& InParams, cons
 void FGTOHeadlessHarness::Tick(const FGTOInputPacket& Packet)
 {
 	const FGTOWheelContacts Contacts = Ground.Contacts(Params, Body);
-	const FGTOStepResult Result = FGTOVehicleSim::Step(VehicleState, Params, Packet, Contacts, Body, StepDt);
+	const FVector GravityVector(0.0, 0.0, -Gravity);
+	const FGTOStepResult Result = FGTOVehicleSim::StepSubstepped(VehicleState, Params, Packet, Contacts, Body, GravityVector, StepDt, NumSubsteps);
 	VehicleState = Result.State;
-	Body = GTOIntegrateRigidBody(Body, Params.Mass, Params.Inertia, Result.Forces, FVector(0.0, 0.0, -Gravity), StepDt);
+	Body = GTOIntegrateRigidBody(Body, Params.Mass, Params.Inertia, Result.Forces, GravityVector, StepDt);
 }

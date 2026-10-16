@@ -20,7 +20,13 @@ Unreal Automation Tests im Namensraum `GTO.` (Sim-Kern: `GTO.Sim.`), headless na
 
 Exit-Code 0 heißt alles grün, sonst 255. Pro Test steht im Log eine Zeile `Test Completed. Result={Success|Fail}`, Fehlschläge zusätzlich als `LogAutomationController: Error:`. Für einen Teil der Tests den Filter enger fassen, z. B. `GTO.Sim.Suspension`.
 
+`GTO.Smoke.` spielt die Testmap `/Game/Maps/FlatTest` per PIE und prüft das Zusammenspiel von Adapter und Chaos. Weitere Konsolenbefehle vor dem Testlauf mit Komma trennen (`-ExecCmds="t.MaxFPS 30,Automation RunTests GTO.;Quit"`); das Semikolon gehört zum Automation-Befehl.
+
 Der Sim-Kern (`Source/GTOSim`) rechnet in SI-Einheiten mit Unreal-Achsen (X vorn, Y rechts, Z oben) und hängt nur von `Core` ab. Szenarien über viele Ticks laufen im Headless-Harness (`GTOHeadlessHarness.h`).
+
+## Binäre Assets
+
+Testmap und `DA_SportsCar` erzeugt `Scripts/create_flat_test_content.py` (Aufruf steht im Skript). Nach Änderungen am Skript neu ausführen statt die Assets von Hand zu bearbeiten. Fremde Assets kommen mit Quelle und Lizenz in `CREDITS.md`.
 
 ## Agent skills
 

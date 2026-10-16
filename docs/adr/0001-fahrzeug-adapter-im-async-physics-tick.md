@@ -28,6 +28,8 @@ Die drei offenen Fragen aus der Spec:
 
 Nicht geklärt hat der Spike, ob über 8 Substeps gemittelte Kräfte das Chassis ausreichend genau treiben (Spec #1). Das zeigt sich erst mit echter Federung und gehört zu #4.
 
+**Nachtrag aus #4: Gemittelte Kräfte genügen.** Der Adapter gibt die über 8 Substeps gemittelten Kräfte einmal pro Chaos-Schritt auf den Körper; Impulse pro Substep sind nicht nötig. Im Headless-Harness (`GTO.Sim.Substepping`, gleicher Ablauf wie im Adapter) kommt das Auto ohne Wippen zur Ruhe, trägt die statischen Achslasten auf 0,5 % genau und weicht beim Einfedern höchstens 2 mm von einem durchgehend mit 960 Hz gerechneten Lauf ab; auch den Fall aus 30 cm fangen die Bump-Stops stabil. In Unreal mit echtem Chaos (`GTO.Smoke.CarStandsStill`) steht das Auto nach 3 s mit Restgeschwindigkeiten um 1e-8 m/s, Achslasten 45,0 : 55,0.
+
 ## Konsequenzen
 
 - **Projekteinstellungen:** `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=1/120`, `MaxPhysicsDeltaTime=0.1`. Unter 10 FPS läuft das Spiel bewusst langsamer statt in eine Nachhol-Spirale zu geraten, weil Nachhol-Schritte ebenfalls Game-Thread-Zeit kosten.

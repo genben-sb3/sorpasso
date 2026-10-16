@@ -7,17 +7,19 @@ public class GTO : ModuleRules
 	public GTO(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		// Headers are included by their path below the module root, e.g. "Vehicle/GTOVehiclePawn.h".
+		PublicIncludePaths.Add(ModuleDirectory);
 
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
-		// Uncomment if you are using online features
-		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GTOSim" });
 
-		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
+		// Chaos and PhysicsCore for the async physics handle of the vehicle adapter.
+		PrivateDependencyModuleNames.AddRange(new string[] { "Chaos", "PhysicsCore" });
+
+		if (Target.bBuildEditor)
+		{
+			// The smoke test ends its PIE session.
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
 	}
 }
