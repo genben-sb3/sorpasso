@@ -13,8 +13,8 @@ public class GTO : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GTOSim" });
 
-		// Chaos and PhysicsCore for the async physics handle of the vehicle adapter.
-		PrivateDependencyModuleNames.AddRange(new string[] { "Chaos", "PhysicsCore" });
+		// Chaos and PhysicsCore for the async physics handle of the vehicle adapter, ProceduralMeshComponent for the track.
+		PrivateDependencyModuleNames.AddRange(new string[] { "Chaos", "PhysicsCore", "ProceduralMeshComponent" });
 
 		if (Target.bBuildEditor)
 		{

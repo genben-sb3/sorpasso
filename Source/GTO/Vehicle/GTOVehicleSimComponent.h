@@ -41,8 +41,11 @@ public:
 
 	FGTOVehicleParams GetParams() const;
 
-	/** Snapshot after the last completed Chaos step: the chassis as Chaos left it, the wheels as the sim core left them. */
-	FGTOVehicleState GetLatestState() const;
+	/**
+	 * Snapshot after the last completed Chaos step: the chassis as Chaos left it, the wheels as the sim core left them.
+	 * OutSimTime receives the sim time of the snapshot (s): fixed steps since the component started, across restarts.
+	 */
+	FGTOVehicleState GetLatestState(double* OutSimTime = nullptr) const;
 
 	/** Snapshot interpolated between the last two for the current frame. */
 	FGTOVehicleState GetDisplayState() const;
@@ -71,6 +74,8 @@ private:
 	FGTOVehicleParams Params;
 	FGTOVehicleState State;  // carried from step to step
 	FGTOVehicleState Latest; // see GetLatestState
+	double LatestSimTime = 0.0;
+	double NextSimTime = 0.0;
 	FGTOSnapshotInterpolator Display;
 	uint32 SimulatedTicks = 0;
 

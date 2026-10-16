@@ -12,6 +12,7 @@ struct FGTOWheelState
 	double SlipAngle = 0.0;         // rad, as the tyre feels it after relaxation; positive when the tyre is pushed right
 	double LongitudinalForce = 0.0; // N, tyre force along the wheel heading
 	double LateralForce = 0.0;      // N, tyre force to the right of the wheel heading
+	double SurfaceFriction = 0.0;   // grip of the ground under the wheel, 1 for dry asphalt; 0 in the air
 };
 
 /** Complete, copyable vehicle state. Serves as the snapshot for replay, ghost, display and tests. */

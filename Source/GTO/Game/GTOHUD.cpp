@@ -1,26 +1,76 @@
 #include "Game/GTOHUD.h"
 
+#include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Game/GTOLapTimer.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "Vehicle/GTOVehiclePawn.h"
 #include "Vehicle/GTOVehicleSimComponent.h"
+
+namespace
+{
+	/** m:ss.mmm, or dashes for no time. */
+	FString FormatLapTime(const TOptional<double>& Seconds)
+	{
+		if (!Seconds)
+		{
+			return TEXT("-:--.---");
+		}
+		const int64 Milliseconds = FMath::RoundToInt64(*Seconds * 1000.0);
+		return FString::Printf(TEXT("%lld:%02lld.%03lld"), Milliseconds / 60000, Milliseconds / 1000 % 60, Milliseconds % 1000);
+	}
+}
 
 void AGTOHUD::DrawHUD()
 {
 	Super::DrawHUD();
 
 	const AGTOVehiclePawn* Vehicle = Cast<AGTOVehiclePawn>(GetOwningPawn());
-	if (!bShowTelemetry || !Vehicle || !Vehicle->GetSim())
+	if (!Vehicle || !Vehicle->GetSim())
 	{
 		return;
 	}
+	if (const FGTOLapTimer* LapTimer = Vehicle->GetLapTimer())
+	{
+		DrawLapTimes(*LapTimer);
+	}
+	if (bShowTelemetry)
+	{
+		DrawTelemetry(*Vehicle);
+	}
+}
 
-	const UGTOVehicleSimComponent* Sim = Vehicle->GetSim();
+void AGTOHUD::DrawLapTimes(const FGTOLapTimer& LapTimer)
+{
+	const TPair<const TCHAR*, TOptional<double>> Rows[] = {
+		{ TEXT("LAP"), LapTimer.GetCurrentLapTime() },
+		{ TEXT("LAST"), LapTimer.GetLastLapTime() },
+		{ TEXT("BEST"), LapTimer.GetBestLapTime() },
+	};
+	UFont* Font = GEngine->GetMediumFont();
+	constexpr float Scale = 1.5f;
+	constexpr float RowHeight = 30.f;
+	const float Right = Canvas->ClipX - 40.f;
+	float Y = 40.f;
+	for (const auto& [Label, Time] : Rows)
+	{
+		const FString Value = FormatLapTime(Time);
+		float Width = 0.f, Height = 0.f;
+		GetTextSize(Value, Width, Height, Font, Scale);
+		DrawText(Label, FLinearColor(0.7f, 0.7f, 0.7f), Right - 260.f, Y, Font, Scale);
+		DrawText(Value, FLinearColor::White, Right - Width, Y, Font, Scale);
+		Y += RowHeight;
+	}
+}
+
+void AGTOHUD::DrawTelemetry(const AGTOVehiclePawn& Vehicle)
+{
+	const UGTOVehicleSimComponent* Sim = Vehicle.GetSim();
 	const FGTOVehicleState State = Sim->GetLatestState();
 	const auto& Wheels = State.Wheels;
 
-	const FGTOInputPacket& Input = Vehicle->GetLastInput();
+	const FGTOInputPacket& Input = Vehicle.GetLastInput();
 	const double Speed = State.Chassis.Orientation.UnrotateVector(State.Chassis.LinearVelocity).X;
 
 	TArray<FString> Lines;
@@ -28,13 +78,13 @@ void AGTOHUD::DrawHUD()
 	Lines.Add(FString::Printf(TEXT("Speed  %.1f km/h"), Speed * 3.6));
 	Lines.Add(FString::Printf(TEXT("Input  steer %+.2f  throttle %.2f  brake %.2f  handbrake %.2f"), Input.Steer, Input.Throttle, Input.Brake, Input.Handbrake));
 	Lines.Add(TEXT(""));
-	Lines.Add(TEXT("Wheel     Load     Travel    Spin       Slip    Angle       Fx        Fy"));
+	Lines.Add(TEXT("Wheel     Load     Travel    Spin       Slip    Angle       Fx        Fy     Grip"));
 	const TCHAR* Names[GTONumWheels] = { TEXT("FL"), TEXT("FR"), TEXT("RL"), TEXT("RR") };
 	for (int32 Index = 0; Index < GTONumWheels; ++Index)
 	{
 		const FGTOWheelState& Wheel = Wheels[Index];
-		Lines.Add(FString::Printf(TEXT("%s     %6.0f N  %5.1f mm  %6.1f/s  %+6.3f  %+6.2f deg  %+6.0f N  %+6.0f N"), Names[Index], Wheel.Load, Wheel.Compression * 1000.0,
-			Wheel.AngularVelocity, Wheel.SlipRatio, FMath::RadiansToDegrees(Wheel.SlipAngle), Wheel.LongitudinalForce, Wheel.LateralForce));
+		Lines.Add(FString::Printf(TEXT("%s     %6.0f N  %5.1f mm  %6.1f/s  %+6.3f  %+6.2f deg  %+6.0f N  %+6.0f N  %4.2f"), Names[Index], Wheel.Load, Wheel.Compression * 1000.0,
+			Wheel.AngularVelocity, Wheel.SlipRatio, FMath::RadiansToDegrees(Wheel.SlipAngle), Wheel.LongitudinalForce, Wheel.LateralForce, Wheel.SurfaceFriction));
 	}
 
 	const auto Load = [&Wheels](EGTOWheel Wheel) { return Wheels[static_cast<int32>(Wheel)].Load; };

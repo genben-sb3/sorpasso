@@ -6,6 +6,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Game/GTOHUD.h"
@@ -15,6 +16,7 @@
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Track/GTOStartFinishLine.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Vehicle/GTOUnits.h"
 #include "Vehicle/GTOVehicleDataAsset.h"
@@ -117,17 +119,26 @@ void AGTOVehiclePawn::BeginPlay()
 	Super::BeginPlay();
 	AddTickPrerequisiteComponent(Sim); // display after the sim has advanced its interpolation
 	StartTransform = GetActorTransform();
+	if (const TActorIterator<AGTOStartFinishLine> Line(GetWorld()); Line)
+	{
+		LapTimer.Emplace(Line->GetTimingGate());
+	}
 	ResetToStart();
 }
 
 void AGTOVehiclePawn::ResetToStart()
 {
+	ResetTo(StartTransform);
+}
+
+void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
+{
 	const UGTOVehicleDataAsset& Data = GetVehicleData();
 	const FGTOVehicleParams Params = Data.ToParams();
 	ApplyShapeAndMeshes(Data);
 
-	const FRotator Rotation(0.0, StartTransform.Rotator().Yaw, 0.0);
-	FVector Location = StartTransform.GetLocation();
+	const FRotator Rotation(0.0, Transform.Rotator().Yaw, 0.0);
+	FVector Location = Transform.GetLocation();
 	FHitResult Hit;
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(GTOResetGround), false, this);
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Location + FVector(0.0, 0.0, 200.0), Location - FVector(0.0, 0.0, 10000.0), ECC_Visibility, Query))
@@ -141,6 +152,10 @@ void AGTOVehiclePawn::ResetToStart()
 	Chassis->SetMassOverrideInKg(NAME_None, Params.Mass, true);
 	Sim->Restart(Chassis, Params);
 	WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
+	if (LapTimer)
+	{
+		LapTimer->Discard();
+	}
 	UpdateDisplay();
 }
 
@@ -169,6 +184,13 @@ void AGTOVehiclePawn::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	LastInput = ScriptedInput ? *ScriptedInput : ReadDriverInput();
 	Sim->QueueInput(LastInput);
+
+	if (LapTimer)
+	{
+		double SimTime = 0.0;
+		const FGTOVehicleState Latest = Sim->GetLatestState(&SimTime);
+		LapTimer->Update(SimTime, Latest.Chassis.Position);
+	}
 
 	const FGTOVehicleState Shown = Sim->GetDisplayState();
 	for (int32 Index = 0; Index < GTONumWheels; ++Index)

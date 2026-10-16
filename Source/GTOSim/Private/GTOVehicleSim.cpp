@@ -68,6 +68,7 @@ namespace
 			Wheel.AngularVelocity = ApplyBrake(Before.AngularVelocity + DriveTorque * Dt / Inertia, BrakeTorque, Inertia, Dt);
 			return Result;
 		}
+		Wheel.SurfaceFriction = Contact.Friction;
 
 		// Wheel axes in the ground plane: heading along the steered wheel, right across it.
 		const FVector Normal = Suspension.Normal;

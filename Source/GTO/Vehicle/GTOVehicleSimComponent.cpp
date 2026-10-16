@@ -29,6 +29,7 @@ void UGTOVehicleSimComponent::Restart(UPrimitiveComponent* Body, const FGTOVehic
 	State.Chassis.Position = Body->GetComponentLocation() / CmPerM;
 	State.Chassis.Orientation = Body->GetComponentQuat();
 	Latest = State;
+	LatestSimTime = NextSimTime;
 	Display.Reset(State, UPhysicsSettings::Get()->AsyncFixedTimeStepSize);
 	InputQueue.Reset();
 }
@@ -48,9 +49,13 @@ FGTOVehicleParams UGTOVehicleSimComponent::GetParams() const
 	return Params;
 }
 
-FGTOVehicleState UGTOVehicleSimComponent::GetLatestState() const
+FGTOVehicleState UGTOVehicleSimComponent::GetLatestState(double* OutSimTime) const
 {
 	FScopeLock ScopeLock(&Lock);
+	if (OutSimTime)
+	{
+		*OutSimTime = LatestSimTime;
+	}
 	return Latest;
 }
 
@@ -87,6 +92,7 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	// rather than where the substeps predicted it.
 	Latest = State;
 	Latest.Chassis = Chassis;
+	LatestSimTime = NextSimTime;
 	Display.Push(Latest);
 
 	const FGTOWheelContacts Contacts = CastWheels(Chassis);
@@ -96,6 +102,7 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	const FGTOStepResult Result = FGTOVehicleSim::StepSubstepped(State, Params, Packet, Contacts, Chassis, Gravity, DeltaTime, NumSubsteps);
 	State = Result.State;
 	++SimulatedTicks;
+	NextSimTime += DeltaTime;
 
 	// Forces through the handle directly: UPhysicsThreadLibrary::AddForce is not callable in 5.8 (ADR 0001).
 	Handle->AddForce(Result.Forces.Force * CmPerM);

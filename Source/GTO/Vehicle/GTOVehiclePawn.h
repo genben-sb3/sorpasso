@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/GTOLapTimer.h"
 #include "GameFramework/Pawn.h"
 #include "GTOVehicleTypes.h"
 #include "GTOVehiclePawn.generated.h"
@@ -34,6 +35,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Vehicle")
 	void ResetToStart();
 
+	/**
+	 * Puts the car on the ground below Transform, level and facing its yaw, at rest with fresh parameters. The lap in
+	 * progress no longer counts.
+	 */
+	void ResetTo(const FTransform& Transform);
+
 	const UGTOVehicleSimComponent* GetSim() const { return Sim; }
 
 	/** Drives the car with Packet instead of the player's controls, e.g. in tests; unset hands control back. */
@@ -41,6 +48,9 @@ public:
 
 	/** Controls sent to the sim on the last frame. */
 	const FGTOInputPacket& GetLastInput() const { return LastInput; }
+
+	/** Session lap times, or null on a map without a start-finish line. */
+	const FGTOLapTimer* GetLapTimer() const { return LapTimer.GetPtrOrNull(); }
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -95,6 +105,7 @@ private:
 	TObjectPtr<UInputAction> HandbrakeAction;
 
 	FTransform StartTransform;
+	TOptional<FGTOLapTimer> LapTimer;
 	TOptional<FGTOInputPacket> ScriptedInput;
 	FGTOInputPacket LastInput;
 

@@ -174,6 +174,48 @@ void FGTODrivingSpec::Define()
 		});
 	});
 
+	Describe("Full lock at 15 m/s on grass", [this]()
+	{
+		// Lateral acceleration and the surface grip the wheels report after 2 s of full lock on ground with Friction.
+		const auto Corner = [](double Friction, double& OutLateralAcceleration, TStaticArray<double, GTONumWheels>& OutSurfaceFriction)
+		{
+			const FGTOVehicleParams Params = MakeSportsCar();
+			FGTOFlatGround Ground;
+			Ground.Friction = Friction;
+			FGTOChassisKinematics Start = DroppedAbove(Params, Ground, 0.0);
+			Start.LinearVelocity.X = 15.0;
+			FGTOHeadlessHarness Harness = MakeAdapterLikeHarness(Params, Ground, Start);
+			RunFor(Harness, 1.0);
+
+			FGTOInputPacket Packet;
+			Packet.Steer = 1.f;
+			RunFor(Harness, 2.0, Packet);
+			const FGTOChassisKinematics& Chassis = Harness.Chassis();
+			OutLateralAcceleration = FMath::Abs(Chassis.AngularVelocity.Z) * Chassis.LinearVelocity.Size2D(); // ω·v in a steady turn
+			for (int32 Index = 0; Index < GTONumWheels; ++Index)
+			{
+				OutSurfaceFriction[Index] = Harness.State().Wheels[Index].SurfaceFriction;
+			}
+		};
+
+		It("reports the grip of the surface under each wheel and corners with less force than on asphalt", [this, Corner]()
+		{
+			double OnAsphalt = 0.0, OnGrass = 0.0;
+			TStaticArray<double, GTONumWheels> AsphaltGrip, GrassGrip;
+			Corner(1.0, OnAsphalt, AsphaltGrip);
+			Corner(0.55, OnGrass, GrassGrip);
+			AddInfo(FString::Printf(TEXT("lateral acceleration on asphalt %.2f m/s², on grass %.2f m/s²"), OnAsphalt, OnGrass));
+
+			for (int32 Index = 0; Index < GTONumWheels; ++Index)
+			{
+				TestEqual(FString::Printf(TEXT("wheel %d reports asphalt"), Index), AsphaltGrip[Index], 1.0);
+				TestEqual(FString::Printf(TEXT("wheel %d reports grass"), Index), GrassGrip[Index], 0.55);
+			}
+			TestTrue(FString::Printf(TEXT("grass holds at most 0.55 g plus the tyre's margin (%.2f m/s²)"), OnGrass), OnGrass < 0.55 * 1.15 * FGTOHeadlessHarness::Gravity);
+			TestTrue(FString::Printf(TEXT("grass holds clearly less than asphalt (%.2f vs %.2f m/s²)"), OnGrass, OnAsphalt), OnGrass < 0.75 * OnAsphalt);
+		});
+	});
+
 	Describe("Braking hard from 30 m/s without ABS", [this]()
 	{
 		It("locks all wheels without the wheel speed oscillating around zero", [this]()
