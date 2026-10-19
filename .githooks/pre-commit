@@ -1,0 +1,3 @@
+#!/bin/sh
+# Baut mit Sanitizern und -Werror und führt alle Tests aus. Aktivieren: git config core.hooksPath .githooks
+exec cmake --workflow --preset pruefen

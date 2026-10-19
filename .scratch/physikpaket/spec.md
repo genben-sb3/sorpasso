@@ -182,7 +182,7 @@ Alles wird mit CMake gebaut und läuft samt Tests im Terminal. Das erste Auto is
 
 ### Physik-Ansatz
 
-Grundlage ist `GTO/research/fahrphysik.md`, Abschnitt 9.
+Grundlage ist `~/workspace/GTO/research/fahrphysik.md`, Abschnitt 9.
 
 - **Reifen:**
   - Magic Formula mit lastabhängigen Koeffizienten (Pac94-artig)
@@ -281,7 +281,7 @@ Wenige Vertragstests:
 
 ### Vorbilder
 
-Im Repo gibt es noch keine Tests. Fachliches Vorbild sind die in `GTO/research/fahrphysik.md` genannten Abnahmekriterien (Abschnitt 9.3) und die Golden-Run-Idee aus Abschnitt 5.3.
+Im Repo gibt es noch keine Tests. Fachliches Vorbild sind die in `~/workspace/GTO/research/fahrphysik.md` genannten Abnahmekriterien (Abschnitt 9.3) und die Golden-Run-Idee aus Abschnitt 5.3.
 
 ## Out of Scope
 
@@ -298,6 +298,6 @@ Im Repo gibt es noch keine Tests. Fachliches Vorbild sind die in `GTO/research/f
 ## Further Notes
 
 - Vor dem Einzug in APEXLINE muss das Repo als privates GitHub-Repo angelegt werden.
-- Die offenen Unreal-Fragen aus `GTO/research/fahrphysik.md`, Abschnitt 9.2 betreffen nur den Adapter, nicht dieses Paket. Dazu gehören der Thread von `AsyncPhysicsTickComponent` und der kleinste mögliche Zeitschritt.
+- Die offenen Unreal-Fragen aus `~/workspace/GTO/research/fahrphysik.md`, Abschnitt 9.2 betreffen nur den Adapter, nicht dieses Paket. Dazu gehören der Thread von `AsyncPhysicsTickComponent` und der kleinste mögliche Zeitschritt.
 - Die Zielwerte des ersten Autos (0–100 in 5,0 s, Bremsweg 35 m, 1,0 g, Vmax 265 km/h) sind Startwerte, keine Abnahmekriterien.
 - Begriffe: siehe `GLOSSARY.md`. Entscheidungen: `docs/adr/0001` bis `0006`.
