@@ -20,7 +20,7 @@ TEST_CASE("Der Fahrzeug-Schritt liefert bei gleichem Eingang den gleichen Ausgan
 
     Karosseriebewegung karosserie;
     karosserie.position = {0.0, 0.0, 0.5};
-    karosserie.geschwindigkeit = {0.0, 0.0, -0.3};
+    karosserie.geschwindigkeit = {12.0, 0.0, -0.3};
     karosserie.drehgeschwindigkeit = {0.05, -0.02, 0.0};
 
     // Jedes Rad steht 4 cm eingefedert auf ebenem Boden.
@@ -31,16 +31,21 @@ TEST_CASE("Der Fahrzeug-Schritt liefert bei gleichem Eingang den gleichen Ausgan
         kontakte[i] = {true, s.start + s.richtung * (s.laenge - 0.04), {0.0, 0.0, 1.0}, 1.0};
     }
 
-    const SchrittErgebnis erster =
-        fahrzeugschritt(Zustand{}, kennwerte, EingabePaket{}, kontakte, karosserie, 1.0 / 120.0);
-    const SchrittErgebnis zweiter =
-        fahrzeugschritt(Zustand{}, kennwerte, EingabePaket{}, kontakte, karosserie, 1.0 / 120.0);
+    // Die Räder drehen etwas zu langsam, gebremst wird halb: Reifen und Bremse arbeiten.
+    const Zustand zustand = rollender_zustand(kennwerte, 11.0);
+    EingabePaket eingabe;
+    eingabe.bremse = 0.5;
+
+    const SchrittErgebnis erster = fahrzeugschritt(zustand, kennwerte, eingabe, kontakte, karosserie, 1.0 / 120.0);
+    const SchrittErgebnis zweiter = fahrzeugschritt(zustand, kennwerte, eingabe, kontakte, karosserie, 1.0 / 120.0);
 
     CHECK(erster.kraefte.kraft.z > 0.0);
+    CHECK(erster.kraefte.kraft.x < 0.0);
     CHECK(bitgleich(erster.kraefte.kraft, zweiter.kraefte.kraft));
     CHECK(bitgleich(erster.kraefte.moment, zweiter.kraefte.moment));
     for (int i = 0; i < anzahl_raeder; ++i) {
         CHECK(bitgleich(erster.telemetrie.radlast[i], zweiter.telemetrie.radlast[i]));
         CHECK(bitgleich(erster.animationsdaten.federweg[i], zweiter.animationsdaten.federweg[i]));
+        CHECK(bitgleich(erster.zustand.raddrehzahl[i], zweiter.zustand.raddrehzahl[i]));
     }
 }

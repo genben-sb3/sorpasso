@@ -35,13 +35,13 @@ private:
 
 } // namespace
 
-std::uint64_t pruefsumme(const Zustand& /*zustand*/, const Karosseriebewegung& karosserie) {
+std::uint64_t pruefsumme(const Zustand& zustand, const Karosseriebewegung& karosserie) {
     Fnv1a f;
     f.nimm(karosserie.position);
     f.nimm(karosserie.ausrichtung);
     f.nimm(karosserie.geschwindigkeit);
     f.nimm(karosserie.drehgeschwindigkeit);
-    // Der Zustand hat noch keine Felder; sie kommen hier dazu, sobald es sie gibt.
+    for (double w : zustand.raddrehzahl) f.nimm(w);
     return f.summe();
 }
 

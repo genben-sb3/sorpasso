@@ -12,3 +12,7 @@
 - [ ] Im Leerlauf und bei getretener Kupplung hält der Motor seine Leerlaufdrehzahl.
 - [ ] Mit zu viel Gas beim Anfahren drehen die Hinterräder durch.
 - [ ] Die Drehzahl in den Animationsdaten ist jetzt die Motordrehzahl.
+
+## Comments
+
+- Aus 03: `antrieb.radmoment` in der Fahrzeugdatei ist das vorläufige direkte Radmoment (Hinterachse, halb und halb). Es wird hier ersetzt; `Antrieb` in `fahrzeugdatei.h` und der Test „Ein direktes Radmoment beschleunigt…“ in `tests/geradeaus_test.cpp` ziehen dann um. Die Kupplung kann denselben begrenzten Impuls nutzen wie die Bremse in `fahrzeugschritt.cpp`.

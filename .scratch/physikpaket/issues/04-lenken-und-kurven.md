@@ -12,3 +12,7 @@
 - [ ] Bremsen in der Kurve verringert die Seitenführung (kombinierter Schlupf).
 - [ ] Langsames Rangieren mit Lenkeinschlag bleibt stabil, ohne Zittern.
 - [ ] Bei hoher Geschwindigkeit schwingt das Auto nach einem Lenkimpuls nicht auf.
+
+## Comments
+
+- Aus 03: `Kurvenform` (B/C/E) gibt es schon für `reifen.laengs`; der Querreifen bekommt eine zweite `Kurvenform`. `fahrzeugschritt` ist lang geworden: beim Einbau von Quer- und kombiniertem Schlupf die Reifen- und Radrechnung in eigene Funktionen ziehen. Die Längsrichtung der Räder kommt heute aus der Karosserie-X-Achse; die Vorderräder brauchen dann den Lenkwinkel.

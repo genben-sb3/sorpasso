@@ -83,6 +83,20 @@ Fahrwerk lies_fahrwerk(Leser& leser, const json& o, const std::string& pfad) {
     return f;
 }
 
+Reifen lies_reifen(Leser& leser, const json& o, const std::string& pfad) {
+    Reifen r;
+    r.spitzenreibwert = leser.zahl(o, pfad, "spitzenreibwert");
+    r.nennlast = leser.zahl(o, pfad, "nennlast");
+    r.lastempfindlichkeit = leser.zahl(o, pfad, "lastempfindlichkeit");
+    r.traegheit = leser.zahl(o, pfad, "traegheit");
+    const std::string laengs = unter(pfad, "laengs");
+    const json& l = leser.objekt(o, pfad, "laengs");
+    r.laengs.steifigkeit = leser.zahl(l, laengs, "steifigkeit");
+    r.laengs.form = leser.zahl(l, laengs, "form");
+    r.laengs.kruemmung = leser.zahl(l, laengs, "kruemmung");
+    return r;
+}
+
 Achse lies_achse(Leser& leser, const json& achsen, const std::string& name) {
     const std::string pfad = unter("achsen", name);
     const json& o = leser.objekt(achsen, "achsen", name);
@@ -92,6 +106,7 @@ Achse lies_achse(Leser& leser, const json& achsen, const std::string& name) {
     a.anlenkhoehe = leser.zahl(o, pfad, "anlenkhoehe");
     a.radradius = leser.zahl(o, pfad, "radradius");
     a.fahrwerk = lies_fahrwerk(leser, leser.objekt(o, pfad, "fahrwerk"), unter(pfad, "fahrwerk"));
+    a.reifen = lies_reifen(leser, leser.objekt(o, pfad, "reifen"), unter(pfad, "reifen"));
     return a;
 }
 
@@ -121,6 +136,17 @@ public:
         if (!(wert >= 0.0)) melde(feld, "darf nicht negativ sein");
     }
 
+    void hoechstens(double wert, double grenze, const std::string& feld) {
+        if (!(wert <= grenze)) melde(feld, "darf höchstens " + zahl_als_text(grenze) + " sein");
+    }
+
+    // Wie zwischen, aber mit eingeschlossenen Grenzen ohne eigene Namen.
+    void bereich(double wert, double unten, double oben, const std::string& feld) {
+        if (!(wert >= unten && wert <= oben)) {
+            melde(feld, "muss zwischen " + zahl_als_text(unten) + " und " + zahl_als_text(oben) + " liegen");
+        }
+    }
+
     void zwischen(double wert, const Grenze& unten, const Grenze& oben, const std::string& feld) {
         if (!(wert > unten.wert && wert < oben.wert)) {
             melde(feld, "muss zwischen " + unten.name + " (" + zahl_als_text(unten.wert) + ") und " + oben.name +
@@ -133,6 +159,23 @@ public:
     }
 };
 
+// Mit C über 2 oder E über 1 verliert die Kurve ihre Form: Sie kippt hinter
+// dem Spitzenwert ins Negative oder hat mehrere Spitzen.
+void pruefe_kurvenform(Plausibilitaet& p, const Kurvenform& k, const std::string& pfad) {
+    p.positiv(k.steifigkeit, unter(pfad, "steifigkeit"));
+    p.positiv(k.form, unter(pfad, "form"));
+    p.hoechstens(k.form, 2.0, unter(pfad, "form"));
+    p.hoechstens(k.kruemmung, 1.0, unter(pfad, "kruemmung"));
+}
+
+void pruefe_reifen(Plausibilitaet& p, const Reifen& r, const std::string& pfad) {
+    p.positiv(r.spitzenreibwert, unter(pfad, "spitzenreibwert"));
+    p.positiv(r.nennlast, unter(pfad, "nennlast"));
+    p.bereich(r.lastempfindlichkeit, 0.0, 1.0, unter(pfad, "lastempfindlichkeit"));
+    p.positiv(r.traegheit, unter(pfad, "traegheit"));
+    pruefe_kurvenform(p, r.laengs, unter(pfad, "laengs"));
+}
+
 void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
     p.positiv(a.spurweite, unter(pfad, "spurweite"));
     p.positiv(a.anlenkhoehe, unter(pfad, "anlenkhoehe"));
@@ -143,6 +186,7 @@ void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
     p.nicht_negativ(a.fahrwerk.daempfer_zug, unter(fw, "daempfer_zug"));
     p.positiv(a.fahrwerk.federweg, unter(fw, "federweg"));
     p.nicht_negativ(a.fahrwerk.anschlagrate, unter(fw, "anschlagrate"));
+    pruefe_reifen(p, a.reifen, unter(pfad, "reifen"));
 }
 
 std::optional<LadeFehler> pruefe(const Kennwerte& k) {
@@ -161,6 +205,9 @@ std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     const double halbe_spur = std::min(k.vorn.spurweite, k.hinten.spurweite) / 2.0;
     p.zwischen(k.schwerpunkt.y, {-halbe_spur, "rechtem Rad"}, {halbe_spur, "linkem Rad"}, "schwerpunkt.y");
     p.positiv(k.schwerpunkt.z, "schwerpunkt.z");
+    p.nicht_negativ(k.bremsen.moment, "bremsen.moment");
+    p.bereich(k.bremsen.balance, 0.0, 1.0, "bremsen.balance");
+    p.nicht_negativ(k.antrieb.radmoment, "antrieb.radmoment");
     return p.fehler;
 }
 
@@ -222,6 +269,10 @@ LadeErgebnis lies_fahrzeugdatei(std::string_view text) {
     const json& achsen = leser.objekt(wurzel, "", "achsen");
     k.vorn = lies_achse(leser, achsen, "vorn");
     k.hinten = lies_achse(leser, achsen, "hinten");
+    const json& bremsen = leser.objekt(wurzel, "", "bremsen");
+    k.bremsen.moment = leser.zahl(bremsen, "bremsen", "moment");
+    k.bremsen.balance = leser.zahl(bremsen, "bremsen", "balance");
+    k.antrieb.radmoment = leser.zahl(leser.objekt(wurzel, "", "antrieb"), "antrieb", "radmoment");
 
     if (leser.fehler) return {{}, leser.fehler};
     if (auto verstoss = pruefe(k)) return {{}, std::move(verstoss)};

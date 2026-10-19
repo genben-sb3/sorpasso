@@ -12,16 +12,26 @@ Radkontakt Testgelaende::taste_ab(const Abtaststrahl& strahl) const {
     // Liegt der Anlenkpunkt schon unter dem Boden, zählt der Strahl ab seinem Start.
     const double weg = std::max(strahl.start.z / -strahl.richtung.z, 0.0);
     if (weg > strahl.laenge) return {};
-    return {true, strahl.start + strahl.richtung * weg, {0.0, 0.0, 1.0}, reibwert};
+    const Vec3 punkt = strahl.start + strahl.richtung * weg;
+    double reibwert_hier = reibwert;
+    for (const Belagzone& zone : belagzonen) {
+        if (punkt.x >= zone.x_von && punkt.x < zone.x_bis && punkt.y >= zone.y_von && punkt.y < zone.y_bis) {
+            reibwert_hier = zone.reibwert;
+            break;
+        }
+    }
+    return {true, punkt, {0.0, 0.0, 1.0}, reibwert_hier};
 }
 
-Testwelt::Testwelt(Kennwerte kennwerte, double absetzhoehe, Testgelaende gelaende)
-    : kennwerte_(std::move(kennwerte)), gelaende_(gelaende) {
+Testwelt::Testwelt(Kennwerte kennwerte, double absetzhoehe, Testgelaende gelaende, double geschwindigkeit)
+    : kennwerte_(std::move(kennwerte)), gelaende_(std::move(gelaende)) {
     double tiefster_punkt = std::numeric_limits<double>::infinity();
     for (const Abtaststrahl& s : abtaststrahlen(kennwerte_, karosserie_)) {
         tiefster_punkt = std::min(tiefster_punkt, (s.start + s.richtung * s.laenge).z);
     }
     karosserie_.position.z = absetzhoehe - tiefster_punkt;
+    karosserie_.geschwindigkeit.x = geschwindigkeit;
+    zustand_ = rollender_zustand(kennwerte_, geschwindigkeit);
 }
 
 void Testwelt::tick(const EingabePaket& eingabe) {

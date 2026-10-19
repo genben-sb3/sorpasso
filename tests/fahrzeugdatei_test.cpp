@@ -105,6 +105,17 @@ TEST_CASE("Eine Vorderachse hinter der Hinterachse wird abgelehnt") {
     CHECK(ergebnis.fehler->meldung == "muss vor der Hinterachse (-2.6) liegen");
 }
 
+TEST_CASE("Reifen ohne Grip werden abgelehnt") {
+    nlohmann::json j = sportcoupe();
+    j["achsen"]["hinten"]["reifen"]["spitzenreibwert"] = 0.0;
+
+    const LadeErgebnis ergebnis = lies(j);
+
+    REQUIRE(ergebnis.fehler.has_value());
+    CHECK(ergebnis.fehler->feld == "achsen.hinten.reifen.spitzenreibwert");
+    CHECK(ergebnis.fehler->meldung == "muss größer als 0 sein");
+}
+
 TEST_CASE("Kennwerte ohne physikalischen Sinn werden mit Feldpfad abgelehnt") {
     struct Fall {
         nlohmann::json::json_pointer feld;
@@ -129,6 +140,19 @@ TEST_CASE("Kennwerte ohne physikalischen Sinn werden mit Feldpfad abgelehnt") {
          "darf nicht negativ sein"},
         {ptr("/achsen/vorn/fahrwerk/anschlagrate"), -1.0, "achsen.vorn.fahrwerk.anschlagrate",
          "darf nicht negativ sein"},
+        {ptr("/achsen/vorn/reifen/nennlast"), 0.0, "achsen.vorn.reifen.nennlast", "muss größer als 0 sein"},
+        {ptr("/achsen/hinten/reifen/lastempfindlichkeit"), -0.1, "achsen.hinten.reifen.lastempfindlichkeit",
+         "muss zwischen 0 und 1 liegen"},
+        {ptr("/achsen/vorn/reifen/traegheit"), 0.0, "achsen.vorn.reifen.traegheit", "muss größer als 0 sein"},
+        {ptr("/achsen/vorn/reifen/laengs/steifigkeit"), 0.0, "achsen.vorn.reifen.laengs.steifigkeit",
+         "muss größer als 0 sein"},
+        {ptr("/achsen/hinten/reifen/laengs/form"), 2.5, "achsen.hinten.reifen.laengs.form",
+         "darf höchstens 2 sein"},
+        {ptr("/achsen/vorn/reifen/laengs/kruemmung"), 1.2, "achsen.vorn.reifen.laengs.kruemmung",
+         "darf höchstens 1 sein"},
+        {ptr("/bremsen/moment"), -1.0, "bremsen.moment", "darf nicht negativ sein"},
+        {ptr("/bremsen/balance"), 1.2, "bremsen.balance", "muss zwischen 0 und 1 liegen"},
+        {ptr("/antrieb/radmoment"), -1.0, "antrieb.radmoment", "darf nicht negativ sein"},
     };
 
     for (const Fall& fall : faelle) {

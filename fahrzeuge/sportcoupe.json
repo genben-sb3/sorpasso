@@ -15,6 +15,17 @@
         "daempfer_zug": 4500.0,
         "federweg": 0.15,
         "anschlagrate": 500000.0
+      },
+      "reifen": {
+        "spitzenreibwert": 1.05,
+        "nennlast": 3400.0,
+        "lastempfindlichkeit": 0.1,
+        "traegheit": 1.2,
+        "laengs": {
+          "steifigkeit": 10.0,
+          "form": 1.9,
+          "kruemmung": 0.97
+        }
       }
     },
     "hinten": {
@@ -28,7 +39,25 @@
         "daempfer_zug": 4200.0,
         "federweg": 0.15,
         "anschlagrate": 500000.0
+      },
+      "reifen": {
+        "spitzenreibwert": 1.05,
+        "nennlast": 3200.0,
+        "lastempfindlichkeit": 0.1,
+        "traegheit": 1.2,
+        "laengs": {
+          "steifigkeit": 10.0,
+          "form": 1.9,
+          "kruemmung": 0.97
+        }
       }
     }
+  },
+  "bremsen": {
+    "moment": 7000.0,
+    "balance": 0.65
+  },
+  "antrieb": {
+    "radmoment": 2000.0
   }
 }

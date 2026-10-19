@@ -44,9 +44,12 @@ struct Kraefte {
     Vec3 moment;
 };
 
-// Vollständiger, kopierbarer Zustand des Fahrzeugmodells. Raddrehzahlen,
-// Relaxations- und Antriebszustände kommen mit Reifen und Antriebsstrang dazu.
-struct Zustand {};
+// Vollständiger, kopierbarer Zustand des Fahrzeugmodells. Relaxations- und
+// Antriebszustände kommen mit Querreifen und Antriebsstrang dazu.
+struct Zustand {
+    std::array<double, anzahl_raeder> raddrehzahl{}; // rad/s, positiv beim Vorwärtsrollen
+};
+
 
 struct Animationsdaten {
     std::array<double, anzahl_raeder> federweg{}; // m Einfederung ab voll ausgefedert
@@ -65,6 +68,9 @@ struct SchrittErgebnis {
 
 std::array<Abtaststrahl, anzahl_raeder> abtaststrahlen(const Kennwerte& kennwerte,
                                                        const Karosseriebewegung& karosserie);
+
+// Zustand eines Autos, das mit der gegebenen Geschwindigkeit geradeaus rollt.
+Zustand rollender_zustand(const Kennwerte& kennwerte, double geschwindigkeit);
 
 // Der Fahrzeug-Schritt: eine reine Funktion ohne globalen Zustand.
 SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwerte,

@@ -16,6 +16,23 @@ struct Fahrwerk {
     double anschlagrate = 0.0;   // N/m zusätzlich hinter dem Anschlag
 };
 
+// Form der Magic-Formula-Kurve über einem Schlupf.
+struct Kurvenform {
+    double steifigkeit = 0.0; // B
+    double form = 0.0;        // C
+    double kruemmung = 0.0;   // E
+};
+
+// Reifen nach der Magic Formula. Der Spitzenreibwert gilt bei Nennlast auf
+// einem Belag mit Reibwert 1 und sinkt mit steigender Radlast.
+struct Reifen {
+    double spitzenreibwert = 0.0;     // D bei Nennlast
+    double nennlast = 0.0;            // N
+    double lastempfindlichkeit = 0.0; // Verlust an Reibwert (relativ) je Nennlast Mehrlast
+    double traegheit = 0.0;           // kg·m², Rad und Reifen um die Drehachse
+    Kurvenform laengs;                // über dem Längsschlupf κ (dimensionslos)
+};
+
 // Eine Achse mit zwei gleichen Rädern links und rechts.
 struct Achse {
     double x = 0.0;           // m, Lage der Achse in Längsrichtung
@@ -23,6 +40,18 @@ struct Achse {
     double anlenkhoehe = 0.0; // m, Höhe des oberen Federbein-Anlenkpunkts
     double radradius = 0.0;   // m
     Fahrwerk fahrwerk;
+    Reifen reifen;
+};
+
+struct Bremsen {
+    double moment = 0.0;  // N·m an allen vier Rädern zusammen bei voll getretener Bremse
+    double balance = 0.0; // Anteil der Vorderachse, 0 … 1
+};
+
+// Vorläufiger Antrieb bis zum Antriebsstrang: ein direktes Moment an den
+// Hinterrädern, verteilt zu gleichen Teilen.
+struct Antrieb {
+    double radmoment = 0.0; // N·m an der Hinterachse zusammen bei Vollgas
 };
 
 // Alle Kennwerte eines Autos. Alle Positionen liegen im selben Fahrzeugsystem
@@ -35,6 +64,8 @@ struct Kennwerte {
     Vec3 schwerpunkt;    // m
     Achse vorn;
     Achse hinten;
+    Bremsen bremsen;
+    Antrieb antrieb;
 };
 
 struct LadeFehler {
