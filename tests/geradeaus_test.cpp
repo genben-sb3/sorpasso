@@ -3,49 +3,17 @@
 #include <algorithm>
 #include <cmath>
 
-#include "ultragravity/testwelt.h"
+#include "fahrt.h"
 
 using namespace ultragravity;
+using namespace ultragravity::test;
 
 namespace {
-
-constexpr double hundert_kmh = 100.0 / 3.6;
-
-Kennwerte sportcoupe() {
-    LadeErgebnis ergebnis = lade_fahrzeugdatei(UG_FAHRZEUGE_DIR "/sportcoupe.json");
-    REQUIRE_FALSE(ergebnis.fehler.has_value());
-    return ergebnis.kennwerte;
-}
-
-// Liefert für jeden Tick der Fahrt ein Eingabe-Paket mit laufender Tick-Nummer.
-class Fahrt {
-public:
-    explicit Fahrt(Testwelt& welt) : welt_(welt) {}
-
-    void fahre(double sekunden, EingabePaket paket = {}) {
-        const int ticks = static_cast<int>(std::lround(sekunden / Testwelt::zeitschritt));
-        for (int i = 0; i < ticks; ++i) einen_tick(paket);
-    }
-
-    void einen_tick(EingabePaket paket) {
-        paket.tick = tick_++;
-        welt_.tick(paket);
-    }
-
-private:
-    Testwelt& welt_;
-    std::uint32_t tick_ = 0;
-};
 
 EingabePaket vollbremsung() {
     EingabePaket paket;
     paket.bremse = 1.0;
     return paket;
-}
-
-double laengsgeschwindigkeit(const Testwelt& welt) {
-    const Karosseriebewegung& k = welt.karosserie();
-    return skalar(k.geschwindigkeit, drehe(k.ausrichtung, {1.0, 0.0, 0.0}));
 }
 
 // Bremst voll, bis das Auto praktisch steht, und liefert den Weg ab Bremsbeginn.
@@ -165,36 +133,4 @@ TEST_CASE("Bei Vollbremsung blockieren die Räder, ohne dass die Raddrehzahl um 
     for (bool b : blockiert) CHECK(b);
     // Das stehende Auto rührt sich nicht mehr.
     CHECK(betrag(welt.karosserie().geschwindigkeit) < 1e-3);
-}
-
-TEST_CASE("Ein direktes Radmoment beschleunigt das Auto aus dem Stand, ohne Zittern beim Anfahren") {
-    const Kennwerte auto_ = sportcoupe();
-    Testwelt welt(auto_, 0.02);
-    Fahrt fahrt(welt);
-    fahrt.fahre(2.0);
-    REQUIRE(std::abs(laengsgeschwindigkeit(welt)) < 1e-6);
-
-    EingabePaket halbgas;
-    halbgas.gas = 0.5;
-    double v = laengsgeschwindigkeit(welt);
-    std::array<double, anzahl_raeder> omega{};
-    for (int tick = 0; tick < 3 * 120; ++tick) {
-        fahrt.einen_tick(halbgas);
-        const double v_neu = laengsgeschwindigkeit(welt);
-        CHECK(v_neu > v);
-        v = v_neu;
-        for (int i = 0; i < anzahl_raeder; ++i) {
-            const double omega_neu = welt.letzter_schritt().zustand.raddrehzahl[i];
-            CHECK(omega_neu > omega[i]);
-            omega[i] = omega_neu;
-        }
-    }
-
-    // Ohne Fahrwiderstände treibt die Antriebskraft T/r die Masse des Autos samt
-    // der Drehträgheit seiner Räder (I/r² je Rad) gleichmäßig an.
-    const double r = auto_.hinten.radradius;
-    const double kraft = 0.5 * auto_.antrieb.radmoment / r;
-    const double masse = auto_.masse + 2.0 * auto_.vorn.reifen.traegheit / (auto_.vorn.radradius * auto_.vorn.radradius) +
-                         2.0 * auto_.hinten.reifen.traegheit / (r * r);
-    CHECK(v == doctest::Approx(kraft / masse * 3.0).epsilon(0.02));
 }

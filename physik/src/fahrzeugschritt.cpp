@@ -64,6 +64,35 @@ double reibwert(const Reifen& r, double radlast, double belag) {
     return std::max(belag * r.spitzenreibwert * (1.0 - r.lastempfindlichkeit * mehrlast), 0.0);
 }
 
+// Unterhalb der Leerlaufdrehzahl gibt der Leerlaufregler über diesen Bereich
+// hinweg von null bis Vollgas.
+constexpr double leerlauf_regelbereich = 100.0 * 2.0 * 3.14159265358979323846 / 60.0; // rad/s
+
+// Drehmoment bei Vollgas, linear zwischen den Stützpunkten, außerhalb der Kurve
+// ihr Randwert.
+double vollgasmoment(const Motor& m, double drehzahl) {
+    const auto& kurve = m.drehmoment;
+    if (drehzahl <= kurve.front().drehzahl) return kurve.front().moment;
+    for (std::size_t i = 1; i < kurve.size(); ++i) {
+        if (drehzahl <= kurve[i].drehzahl) {
+            const Stuetzpunkt& a = kurve[i - 1];
+            const Stuetzpunkt& b = kurve[i];
+            return a.moment + (b.moment - a.moment) * (drehzahl - a.drehzahl) / (b.drehzahl - a.drehzahl);
+        }
+    }
+    return kurve.back().moment;
+}
+
+// Moment des Motors an der Kurbelwelle: Der Leerlaufregler gibt unter der
+// Leerlaufdrehzahl Gas, der Begrenzer nimmt es über der Höchstdrehzahl weg, und
+// ohne Gas schleppt der Motor (Motorbremse).
+double motormoment(const Motor& m, double drehzahl, double gas) {
+    const double regler = std::clamp((m.leerlaufdrehzahl - drehzahl) / leerlauf_regelbereich, 0.0, 1.0);
+    const double wirksam = drehzahl >= m.hoechstdrehzahl ? 0.0 : std::max(gas, regler);
+    const double schlepp = m.schleppmoment * std::max(drehzahl, 0.0) / m.hoechstdrehzahl;
+    return wirksam * vollgasmoment(m, drehzahl) - (1.0 - wirksam) * schlepp;
+}
+
 // Was ein Rad über alle Zwischenschritte eines Schritts gleich bleibt.
 struct Radlage {
     const Achse* achse = nullptr;
@@ -72,7 +101,6 @@ struct Radlage {
     Vec3 laengs;          // Rollrichtung in der Bodenebene
     Vec3 v_kontakt;              // Geschwindigkeit der Karosserie im Kontaktpunkt
     double haftkraft = 0.0;      // N, Radlast mal Reibwert
-    double antriebsmoment = 0.0; // N·m
     double bremsmoment = 0.0;    // N·m
 };
 
@@ -82,6 +110,7 @@ Zustand rollender_zustand(const Kennwerte& kennwerte, double geschwindigkeit) {
     Zustand z;
     const auto aufhaengungen = radaufhaengungen(kennwerte);
     for (int i = 0; i < anzahl_raeder; ++i) z.raddrehzahl[i] = geschwindigkeit / aufhaengungen[i].achse->radradius;
+    z.motordrehzahl = kennwerte.antrieb.motor.leerlaufdrehzahl;
     return z;
 }
 
@@ -114,7 +143,6 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
         const bool hinten = i >= hinten_links;
         const double achsanteil = hinten ? 1.0 - kennwerte.bremsen.balance : kennwerte.bremsen.balance;
         rad.bremsmoment = eingabe.bremse * kennwerte.bremsen.moment * achsanteil / 2.0;
-        rad.antriebsmoment = hinten ? eingabe.gas * kennwerte.antrieb.radmoment / 2.0 : 0.0;
 
         const Radkontakt& kontakt = kontakte[i];
         if (!kontakt.kontakt) continue;
@@ -152,16 +180,39 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     // Karosserie wird mit den Reifenkräften mitgeführt, damit der steife Reifen bei
     // kleinem Schlupfnenner nicht über den ganzen Tick gegen eine veraltete
     // Geschwindigkeit arbeitet (GTO/research/fahrphysik.md, 9.2).
+    // Gangwechsel: Der gewünschte Gang greift erst nach der Schaltzeit, bis dahin
+    // gibt es keinen Kraftschluss. Den Rückwärtsgang gibt es noch nicht.
+    const Antrieb& antrieb = kennwerte.antrieb;
+    const int gaenge = static_cast<int>(antrieb.getriebe.uebersetzungen.size());
+    const int gangwunsch = std::clamp(static_cast<int>(eingabe.gangwunsch), 0, gaenge);
+    if (gangwunsch != ergebnis.zustand.gang) {
+        ergebnis.zustand.gang = gangwunsch;
+        ergebnis.zustand.schaltrest = antrieb.getriebe.schaltzeit;
+    }
+    const double kupplungsmoment = antrieb.kupplung.moment * (1.0 - eingabe.kupplung); // N·m
+    // Gesamtübersetzung vom Motor zur Hinterachse; das offene Differenzial gibt
+    // beiden Hinterrädern dasselbe Moment.
+    const double uebersetzung = ergebnis.zustand.gang > 0
+                                    ? antrieb.getriebe.uebersetzungen[ergebnis.zustand.gang - 1] *
+                                          antrieb.getriebe.achsuebersetzung
+                                    : 0.0;
+    const double radtraegheit_hinten = kennwerte.hinten.reifen.traegheit;
+    double& motordrehzahl = ergebnis.zustand.motordrehzahl;
+
     const double h = dt / zwischenschritte;
     const double gewicht_zwischenschritt = 1.0 / zwischenschritte;
     Vec3 dv_karosserie;
     for (int schritt = 0; schritt < zwischenschritte; ++schritt) {
+        motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, eingabe.gas) / antrieb.motor.traegheit;
+        motordrehzahl = std::max(motordrehzahl, 0.0);
+
         Vec3 reifenkraft_gesamt;
+        std::array<double, anzahl_raeder> drehzahl_frei{}; // rad/s nach Reifen und Antrieb, vor der Bremse
         for (int i = 0; i < anzahl_raeder; ++i) {
             const Radlage& rad = raeder[i];
             const Reifen& reifen = rad.achse->reifen;
             const double r = rad.achse->radradius;
-            double& omega = ergebnis.zustand.raddrehzahl[i];
+            const double omega = ergebnis.zustand.raddrehzahl[i];
 
             double fx = 0.0;
             double dfx_domega = 0.0;
@@ -176,14 +227,8 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
 
             // Halbimplizit: Die Reifenkraft wird um die neue Raddrehzahl linearisiert,
             // sonst schwingt das Rad bei kleinem Schlupfnenner.
-            const double omega_frei = omega + h * (rad.antriebsmoment - fx * r) / reifen.traegheit /
-                                                  (1.0 + h * r * dfx_domega / reifen.traegheit);
-            fx = std::clamp(fx + dfx_domega * (omega_frei - omega), -rad.haftkraft, rad.haftkraft);
-
-            // Die Bremse ist ein begrenzter Impuls Richtung Stillstand: Reicht er,
-            // steht das Rad, sonst nimmt er seinen vollen Betrag weg.
-            const double bremsimpuls = rad.bremsmoment * h / reifen.traegheit;
-            omega = std::abs(omega_frei) <= bremsimpuls ? 0.0 : omega_frei - std::copysign(bremsimpuls, omega_frei);
+            drehzahl_frei[i] = omega - h * fx * r / reifen.traegheit / (1.0 + h * r * dfx_domega / reifen.traegheit);
+            fx = std::clamp(fx + dfx_domega * (drehzahl_frei[i] - omega), -rad.haftkraft, rad.haftkraft);
 
             if (!rad.kontakt) continue;
             const Vec3 kraft = rad.laengs * fx;
@@ -192,7 +237,33 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
             ergebnis.kraefte.moment += kreuz(rad.hebel, kraft) * gewicht_zwischenschritt;
         }
         dv_karosserie += reifenkraft_gesamt * (h / kennwerte.masse);
+
+        // Die Kupplung ist ein begrenzter Impuls, der Motor und Getriebeeingang
+        // auf gleiche Drehzahl bringt: Reicht ihr Moment, haftet sie, sonst rutscht sie.
+        ergebnis.zustand.schaltrest = std::max(ergebnis.zustand.schaltrest - h, 0.0);
+        if (uebersetzung > 0.0 && ergebnis.zustand.schaltrest == 0.0) {
+            const double eingang =
+                uebersetzung * (drehzahl_frei[hinten_links] + drehzahl_frei[hinten_rechts]) / 2.0;
+            const double kehrwert_traegheit =
+                1.0 / antrieb.motor.traegheit + uebersetzung * uebersetzung / (2.0 * radtraegheit_hinten);
+            const double grenze = kupplungsmoment * h; // N·m·s
+            const double impuls = std::clamp((motordrehzahl - eingang) / kehrwert_traegheit, -grenze, grenze);
+            motordrehzahl -= impuls / antrieb.motor.traegheit;
+            for (int i : {hinten_links, hinten_rechts}) {
+                drehzahl_frei[i] += impuls * uebersetzung / (2.0 * radtraegheit_hinten);
+            }
+        }
+
+        // Die Bremse ist ein begrenzter Impuls Richtung Stillstand: Reicht er,
+        // steht das Rad, sonst nimmt er seinen vollen Betrag weg.
+        for (int i = 0; i < anzahl_raeder; ++i) {
+            const double bremsimpuls = raeder[i].bremsmoment * h / raeder[i].achse->reifen.traegheit;
+            const double frei = drehzahl_frei[i];
+            ergebnis.zustand.raddrehzahl[i] =
+                std::abs(frei) <= bremsimpuls ? 0.0 : frei - std::copysign(bremsimpuls, frei);
+        }
     }
+    ergebnis.animationsdaten.drehzahl = ergebnis.zustand.motordrehzahl;
     return ergebnis;
 }
 

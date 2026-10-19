@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -32,6 +33,23 @@ TEST_CASE("Das Sportcoupé lädt aus seiner Fahrzeugdatei") {
     CHECK(auto_.masse == doctest::Approx(1350.0));
     CHECK(auto_.vorn.x - auto_.hinten.x == doctest::Approx(2.6));
     CHECK(auto_.hinten.fahrwerk.daempfer_zug > auto_.hinten.fahrwerk.daempfer_druck);
+}
+
+TEST_CASE("Das Sportcoupé hat 300 PS und sechs Gänge") {
+    const LadeErgebnis ergebnis = lade_fahrzeugdatei(sportcoupe_pfad);
+
+    REQUIRE_FALSE(ergebnis.fehler.has_value());
+    const Antrieb& antrieb = ergebnis.kennwerte.antrieb;
+    CHECK(antrieb.getriebe.uebersetzungen.size() == 6);
+    // Die Fahrzeugdatei nennt Drehzahlen in U/min, die Kennwerte in rad/s.
+    constexpr double u_min = 2.0 * 3.14159265358979323846 / 60.0;
+    CHECK(antrieb.motor.leerlaufdrehzahl == doctest::Approx(900.0 * u_min));
+    double spitzenleistung = 0.0;
+    for (const Stuetzpunkt& p : antrieb.motor.drehmoment) {
+        spitzenleistung = std::max(spitzenleistung, p.drehzahl * p.moment);
+    }
+    constexpr double ps = 735.49875; // W
+    CHECK(spitzenleistung / ps == doctest::Approx(300.0).epsilon(0.01));
 }
 
 TEST_CASE("Kaputtes JSON meldet Zeile und Spalte") {
@@ -152,7 +170,27 @@ TEST_CASE("Kennwerte ohne physikalischen Sinn werden mit Feldpfad abgelehnt") {
          "darf höchstens 1 sein"},
         {ptr("/bremsen/moment"), -1.0, "bremsen.moment", "darf nicht negativ sein"},
         {ptr("/bremsen/balance"), 1.2, "bremsen.balance", "muss zwischen 0 und 1 liegen"},
-        {ptr("/antrieb/radmoment"), -1.0, "antrieb.radmoment", "darf nicht negativ sein"},
+        {ptr("/antrieb/motor/drehmoment/0/u_min"), 0.0, "antrieb.motor.drehmoment[0].u_min",
+         "muss größer als 0 sein"},
+        {ptr("/antrieb/motor/drehmoment/2/u_min"), 1500.0, "antrieb.motor.drehmoment[2].u_min",
+         "muss größer als beim vorigen Stützpunkt sein"},
+        {ptr("/antrieb/motor/drehmoment/3/moment"), -10.0, "antrieb.motor.drehmoment[3].moment",
+         "darf nicht negativ sein"},
+        {ptr("/antrieb/motor/leerlauf_u_min"), 0.0, "antrieb.motor.leerlauf_u_min", "muss größer als 0 sein"},
+        {ptr("/antrieb/motor/hoechst_u_min"), 800.0, "antrieb.motor.hoechst_u_min",
+         "muss über der Leerlaufdrehzahl liegen"},
+        {ptr("/antrieb/motor/hoechst_u_min"), 9000.0, "antrieb.motor.hoechst_u_min",
+         "darf nicht über dem letzten Stützpunkt der Drehmomentkurve liegen"},
+        {ptr("/antrieb/motor/traegheit"), 0.0, "antrieb.motor.traegheit", "muss größer als 0 sein"},
+        {ptr("/antrieb/motor/schleppmoment"), -1.0, "antrieb.motor.schleppmoment", "darf nicht negativ sein"},
+        {ptr("/antrieb/kupplung/moment"), 0.0, "antrieb.kupplung.moment", "muss größer als 0 sein"},
+        {ptr("/antrieb/getriebe/uebersetzungen/0"), 0.0, "antrieb.getriebe.uebersetzungen[0]",
+         "muss größer als 0 sein"},
+        {ptr("/antrieb/getriebe/uebersetzungen/3"), 2.0, "antrieb.getriebe.uebersetzungen[3]",
+         "muss kleiner als im vorigen Gang sein"},
+        {ptr("/antrieb/getriebe/achsuebersetzung"), 0.0, "antrieb.getriebe.achsuebersetzung",
+         "muss größer als 0 sein"},
+        {ptr("/antrieb/getriebe/schaltzeit"), -0.1, "antrieb.getriebe.schaltzeit", "darf nicht negativ sein"},
     };
 
     for (const Fall& fall : faelle) {
@@ -167,6 +205,31 @@ TEST_CASE("Kennwerte ohne physikalischen Sinn werden mit Feldpfad abgelehnt") {
         CHECK(ergebnis.fehler->feld == fall.pfad);
         CHECK(ergebnis.fehler->meldung == fall.meldung);
     }
+}
+
+TEST_CASE("Ein Motor ohne Drehmomentkurve und ein Getriebe ohne Gänge werden abgelehnt") {
+    for (const char* feld : {"/antrieb/motor/drehmoment", "/antrieb/getriebe/uebersetzungen"}) {
+        const std::string zeiger = feld;
+        CAPTURE(zeiger);
+        nlohmann::json j = sportcoupe();
+        j[nlohmann::json::json_pointer(zeiger)] = nlohmann::json::array();
+
+        const LadeErgebnis ergebnis = lies(j);
+
+        REQUIRE(ergebnis.fehler.has_value());
+        CHECK(ergebnis.fehler->meldung == "darf nicht leer sein");
+    }
+}
+
+TEST_CASE("Ein Stützpunkt der Drehmomentkurve, der kein Objekt ist, wird mit seinem Pfad gemeldet") {
+    nlohmann::json j = sportcoupe();
+    j["antrieb"]["motor"]["drehmoment"][1] = 42.0;
+
+    const LadeErgebnis ergebnis = lies(j);
+
+    REQUIRE(ergebnis.fehler.has_value());
+    CHECK(ergebnis.fehler->feld == "antrieb.motor.drehmoment[1]");
+    CHECK(ergebnis.fehler->meldung == "ist kein Objekt");
 }
 
 TEST_CASE("Unbrauchbare Eingaben liefern einen Fehler statt abzustürzen") {

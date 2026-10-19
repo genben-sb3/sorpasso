@@ -11,3 +11,6 @@
 - [ ] Jedes Ergebnis stimmt mit einer unabhängigen Messung am Verlauf der Fahrt überein.
 - [ ] Ein Testmanöver, dessen Ziel nicht erreicht wird (zum Beispiel 200 km/h bei zu wenig Leistung), meldet „gescheitert“ mit Grund.
 - [ ] Der Testfahrer erzeugt ausschließlich Eingabe-Pakete.
+
+## Comments
+- Aus 06: Der Test „…0–100 km/h in plausibler Zeit“ in `tests/antrieb_test.cpp` lässt 4,5…7,0 s durch (gemessen 6,0 s). Mit dem Testmanöver hier das Band schärfen und den groben Anfahrvorgang des Testfahrers dort verbessern.

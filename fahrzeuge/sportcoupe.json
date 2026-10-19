@@ -58,6 +58,29 @@
     "balance": 0.65
   },
   "antrieb": {
-    "radmoment": 2000.0
+    "motor": {
+      "drehmoment": [
+        { "u_min": 1000.0, "moment": 250.0 },
+        { "u_min": 2000.0, "moment": 310.0 },
+        { "u_min": 3000.0, "moment": 350.0 },
+        { "u_min": 4000.0, "moment": 370.0 },
+        { "u_min": 5000.0, "moment": 370.0 },
+        { "u_min": 6000.0, "moment": 345.0 },
+        { "u_min": 6500.0, "moment": 324.0 },
+        { "u_min": 7500.0, "moment": 270.0 }
+      ],
+      "leerlauf_u_min": 900.0,
+      "hoechst_u_min": 7200.0,
+      "traegheit": 0.2,
+      "schleppmoment": 60.0
+    },
+    "kupplung": {
+      "moment": 550.0
+    },
+    "getriebe": {
+      "uebersetzungen": [3.2, 2.2, 1.6, 1.25, 1.0, 0.82],
+      "achsuebersetzung": 3.6,
+      "schaltzeit": 0.25
+    }
   }
 }

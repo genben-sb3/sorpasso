@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ultragravity/vektor.h"
 
@@ -48,10 +49,35 @@ struct Bremsen {
     double balance = 0.0; // Anteil der Vorderachse, 0 … 1
 };
 
-// Vorläufiger Antrieb bis zum Antriebsstrang: ein direktes Moment an den
-// Hinterrädern, verteilt zu gleichen Teilen.
+// Ein Punkt der Drehmomentkurve bei Vollgas. Dazwischen wird linear interpoliert.
+struct Stuetzpunkt {
+    double drehzahl = 0.0; // rad/s
+    double moment = 0.0;   // N·m
+};
+
+struct Motor {
+    std::vector<Stuetzpunkt> drehmoment; // nach Drehzahl aufsteigend
+    double leerlaufdrehzahl = 0.0;       // rad/s
+    double hoechstdrehzahl = 0.0;        // rad/s, darüber nimmt der Begrenzer das Gas weg
+    double traegheit = 0.0;              // kg·m², Motor samt Schwungrad
+    double schleppmoment = 0.0;          // N·m ohne Gas bei Höchstdrehzahl, linear mit der Drehzahl
+};
+
+struct Kupplung {
+    double moment = 0.0; // N·m, das sie eingekuppelt höchstens überträgt
+};
+
+struct Getriebe {
+    std::vector<double> uebersetzungen; // 1, vom ersten Gang an absteigend
+    double achsuebersetzung = 0.0;      // 1
+    double schaltzeit = 0.0;            // s ohne Kraftschluss je Gangwechsel
+};
+
+// Heckantrieb mit offenem Differenzial.
 struct Antrieb {
-    double radmoment = 0.0; // N·m an der Hinterachse zusammen bei Vollgas
+    Motor motor;
+    Kupplung kupplung;
+    Getriebe getriebe;
 };
 
 // Alle Kennwerte eines Autos. Alle Positionen liegen im selben Fahrzeugsystem

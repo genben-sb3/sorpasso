@@ -49,6 +49,34 @@ public:
         return feld ? feld->get<std::string>() : std::string{};
     }
 
+    // Eine Liste mit Pfadangabe. Ihre Elemente heißen pfad[0], pfad[1], …
+    const json& liste(const json& eltern, const std::string& pfad, const std::string& name) {
+        const json* feld = finde(eltern, pfad, name);
+        if (feld && !feld->is_array()) {
+            melde(unter(pfad, name), "ist keine Liste");
+            return leere_liste_;
+        }
+        return feld ? *feld : leere_liste_;
+    }
+
+    const json& objekt(const json& element, const std::string& pfad) {
+        if (fehler) return leer_;
+        if (!element.is_object()) {
+            melde(pfad, "ist kein Objekt");
+            return leer_;
+        }
+        return element;
+    }
+
+    double zahl(const json& element, const std::string& pfad) {
+        if (fehler) return 0.0;
+        if (!element.is_number()) {
+            melde(pfad, "ist keine Zahl");
+            return 0.0;
+        }
+        return element.get<double>();
+    }
+
     Vec3 vektor(const json& eltern, const std::string& pfad, const std::string& name) {
         const json& o = objekt(eltern, pfad, name);
         const std::string p = unter(pfad, name);
@@ -71,6 +99,7 @@ private:
     }
 
     const json leer_ = json::object();
+    const json leere_liste_ = json::array();
 };
 
 Fahrwerk lies_fahrwerk(Leser& leser, const json& o, const std::string& pfad) {
@@ -107,6 +136,40 @@ Achse lies_achse(Leser& leser, const json& achsen, const std::string& name) {
     a.radradius = leser.zahl(o, pfad, "radradius");
     a.fahrwerk = lies_fahrwerk(leser, leser.objekt(o, pfad, "fahrwerk"), unter(pfad, "fahrwerk"));
     a.reifen = lies_reifen(leser, leser.objekt(o, pfad, "reifen"), unter(pfad, "reifen"));
+    return a;
+}
+
+std::string element(const std::string& pfad, std::size_t index) { return pfad + "[" + std::to_string(index) + "]"; }
+
+constexpr double u_min = 2.0 * 3.14159265358979323846 / 60.0; // rad/s je U/min
+
+Antrieb lies_antrieb(Leser& leser, const json& wurzel) {
+    Antrieb a;
+    const json& o = leser.objekt(wurzel, "", "antrieb");
+
+    const json& m = leser.objekt(o, "antrieb", "motor");
+    const std::string motor = "antrieb.motor";
+    const json& kurve = leser.liste(m, motor, "drehmoment");
+    for (std::size_t i = 0; i < kurve.size(); ++i) {
+        const std::string pfad = element(unter(motor, "drehmoment"), i);
+        const json& punkt = leser.objekt(kurve[i], pfad);
+        a.motor.drehmoment.push_back({leser.zahl(punkt, pfad, "u_min") * u_min, leser.zahl(punkt, pfad, "moment")});
+    }
+    a.motor.leerlaufdrehzahl = leser.zahl(m, motor, "leerlauf_u_min") * u_min;
+    a.motor.hoechstdrehzahl = leser.zahl(m, motor, "hoechst_u_min") * u_min;
+    a.motor.traegheit = leser.zahl(m, motor, "traegheit");
+    a.motor.schleppmoment = leser.zahl(m, motor, "schleppmoment");
+
+    a.kupplung.moment = leser.zahl(leser.objekt(o, "antrieb", "kupplung"), "antrieb.kupplung", "moment");
+
+    const json& g = leser.objekt(o, "antrieb", "getriebe");
+    const std::string getriebe = "antrieb.getriebe";
+    const json& gaenge = leser.liste(g, getriebe, "uebersetzungen");
+    for (std::size_t i = 0; i < gaenge.size(); ++i) {
+        a.getriebe.uebersetzungen.push_back(leser.zahl(gaenge[i], element(unter(getriebe, "uebersetzungen"), i)));
+    }
+    a.getriebe.achsuebersetzung = leser.zahl(g, getriebe, "achsuebersetzung");
+    a.getriebe.schaltzeit = leser.zahl(g, getriebe, "schaltzeit");
     return a;
 }
 
@@ -154,6 +217,10 @@ public:
         }
     }
 
+    void nicht_leer(std::size_t anzahl, const std::string& feld) {
+        if (anzahl == 0) melde(feld, "darf nicht leer sein");
+    }
+
     void melde(const std::string& feld, std::string meldung) {
         if (!fehler) fehler = LadeFehler{feld, std::move(meldung)};
     }
@@ -189,6 +256,42 @@ void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
     pruefe_reifen(p, a.reifen, unter(pfad, "reifen"));
 }
 
+void pruefe_motor(Plausibilitaet& p, const Motor& m, const std::string& pfad) {
+    const std::string kurve = unter(pfad, "drehmoment");
+    p.nicht_leer(m.drehmoment.size(), kurve);
+    for (std::size_t i = 0; i < m.drehmoment.size(); ++i) {
+        const std::string punkt = element(kurve, i);
+        if (i == 0) {
+            p.positiv(m.drehmoment[i].drehzahl, unter(punkt, "u_min"));
+        } else if (!(m.drehmoment[i].drehzahl > m.drehmoment[i - 1].drehzahl)) {
+            p.melde(unter(punkt, "u_min"), "muss größer als beim vorigen Stützpunkt sein");
+        }
+        p.nicht_negativ(m.drehmoment[i].moment, unter(punkt, "moment"));
+    }
+    p.positiv(m.leerlaufdrehzahl, unter(pfad, "leerlauf_u_min"));
+    if (!(m.hoechstdrehzahl > m.leerlaufdrehzahl)) {
+        p.melde(unter(pfad, "hoechst_u_min"), "muss über der Leerlaufdrehzahl liegen");
+    }
+    if (!m.drehmoment.empty() && !(m.hoechstdrehzahl <= m.drehmoment.back().drehzahl)) {
+        p.melde(unter(pfad, "hoechst_u_min"), "darf nicht über dem letzten Stützpunkt der Drehmomentkurve liegen");
+    }
+    p.positiv(m.traegheit, unter(pfad, "traegheit"));
+    p.nicht_negativ(m.schleppmoment, unter(pfad, "schleppmoment"));
+}
+
+void pruefe_getriebe(Plausibilitaet& p, const Getriebe& g, const std::string& pfad) {
+    const std::string gaenge = unter(pfad, "uebersetzungen");
+    p.nicht_leer(g.uebersetzungen.size(), gaenge);
+    for (std::size_t i = 0; i < g.uebersetzungen.size(); ++i) {
+        p.positiv(g.uebersetzungen[i], element(gaenge, i));
+        if (i > 0 && !(g.uebersetzungen[i] < g.uebersetzungen[i - 1])) {
+            p.melde(element(gaenge, i), "muss kleiner als im vorigen Gang sein");
+        }
+    }
+    p.positiv(g.achsuebersetzung, unter(pfad, "achsuebersetzung"));
+    p.nicht_negativ(g.schaltzeit, unter(pfad, "schaltzeit"));
+}
+
 std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     Plausibilitaet p;
     p.positiv(k.masse, "masse");
@@ -207,7 +310,9 @@ std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     p.positiv(k.schwerpunkt.z, "schwerpunkt.z");
     p.nicht_negativ(k.bremsen.moment, "bremsen.moment");
     p.bereich(k.bremsen.balance, 0.0, 1.0, "bremsen.balance");
-    p.nicht_negativ(k.antrieb.radmoment, "antrieb.radmoment");
+    pruefe_motor(p, k.antrieb.motor, "antrieb.motor");
+    p.positiv(k.antrieb.kupplung.moment, "antrieb.kupplung.moment");
+    pruefe_getriebe(p, k.antrieb.getriebe, "antrieb.getriebe");
     return p.fehler;
 }
 
@@ -272,7 +377,7 @@ LadeErgebnis lies_fahrzeugdatei(std::string_view text) {
     const json& bremsen = leser.objekt(wurzel, "", "bremsen");
     k.bremsen.moment = leser.zahl(bremsen, "bremsen", "moment");
     k.bremsen.balance = leser.zahl(bremsen, "bremsen", "balance");
-    k.antrieb.radmoment = leser.zahl(leser.objekt(wurzel, "", "antrieb"), "antrieb", "radmoment");
+    k.antrieb = lies_antrieb(leser, wurzel);
 
     if (leser.fehler) return {{}, leser.fehler};
     if (auto verstoss = pruefe(k)) return {{}, std::move(verstoss)};
