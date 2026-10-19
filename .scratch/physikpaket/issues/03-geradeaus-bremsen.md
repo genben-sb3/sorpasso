@@ -11,3 +11,7 @@
 - [ ] Beim Bremsen nickt die Karosserie nach vorn, die Vorderachse trägt mehr Last.
 - [ ] Bei Vollbremsung blockieren die Räder sauber, ohne dass die Raddrehzahl um null schwingt.
 - [ ] Ein direktes Radmoment beschleunigt das Auto aus dem Stand, ohne Zittern beim Anfahren.
+
+## Comments
+
+- Aus dem Review von 01: In 01 wirkt nur die Radlast entlang der Bodennormalen, der Reibwert wird noch nicht gelesen. „Kein Wegrutschen“ aus 01 ist deshalb erst mit Reifenkräften wirklich geprüft. Den Stand-Test aus `tests/stand_test.cpp` hier erneut grün bekommen. Ebenso kommen hier die 8 Zwischenschritte und die über den Schritt gemittelten Kräfte (Spec, Naht 2) dazu.

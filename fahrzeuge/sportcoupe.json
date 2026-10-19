@@ -1,0 +1,34 @@
+{
+  "name": "Sportcoupé",
+  "masse": 1350.0,
+  "traegheit": { "x": 450.0, "y": 1900.0, "z": 2100.0 },
+  "schwerpunkt": { "x": -1.248, "y": 0.0, "z": 0.48 },
+  "achsen": {
+    "vorn": {
+      "x": 0.0,
+      "spurweite": 1.56,
+      "anlenkhoehe": 0.42,
+      "radradius": 0.33,
+      "fahrwerk": {
+        "federrate": 55000.0,
+        "daempfer_druck": 3000.0,
+        "daempfer_zug": 4500.0,
+        "federweg": 0.15,
+        "anschlagrate": 500000.0
+      }
+    },
+    "hinten": {
+      "x": -2.6,
+      "spurweite": 1.58,
+      "anlenkhoehe": 0.42,
+      "radradius": 0.33,
+      "fahrwerk": {
+        "federrate": 50000.0,
+        "daempfer_druck": 2800.0,
+        "daempfer_zug": 4200.0,
+        "federweg": 0.15,
+        "anschlagrate": 500000.0
+      }
+    }
+  }
+}

@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Ein Befehl baut alles, ein Befehl führt alle Tests aus.
-- [ ] Das Physikpaket baut als eigenes Ziel ohne Testwelt.
-- [ ] Ein abgesetztes Auto federt ein und kommt zur Ruhe; danach bewegt es sich über mehrere Sekunden praktisch nicht (kein Zittern, kein Wegrutschen).
-- [ ] Die Achslasten im Stand stimmen mit der statischen Verteilung aus Schwerpunktlage und Radstand überein (Toleranz).
-- [ ] Zwei Läufe mit denselben Eingabe-Paketen ergeben dieselbe Prüfsumme (ADR-0005).
-- [ ] Der Fahrzeug-Schritt ist eine reine Funktion ohne globalen Zustand.
+- [x] Ein Befehl baut alles, ein Befehl führt alle Tests aus.
+- [x] Das Physikpaket baut als eigenes Ziel ohne Testwelt.
+- [x] Ein abgesetztes Auto federt ein und kommt zur Ruhe; danach bewegt es sich über mehrere Sekunden praktisch nicht (kein Zittern, kein Wegrutschen).
+- [x] Die Achslasten im Stand stimmen mit der statischen Verteilung aus Schwerpunktlage und Radstand überein (Toleranz).
+- [x] Zwei Läufe mit denselben Eingabe-Paketen ergeben dieselbe Prüfsumme (ADR-0005).
+- [x] Der Fahrzeug-Schritt ist eine reine Funktion ohne globalen Zustand.

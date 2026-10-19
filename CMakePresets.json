@@ -1,0 +1,36 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "standard",
+      "displayName": "Ninja, Debug mit Optimierung",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "standard", "configurePreset": "standard" }
+  ],
+  "testPresets": [
+    {
+      "name": "standard",
+      "configurePreset": "standard",
+      "output": { "outputOnFailure": true }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "standard",
+      "displayName": "Konfigurieren, bauen und alle Tests ausführen",
+      "steps": [
+        { "type": "configure", "name": "standard" },
+        { "type": "build", "name": "standard" },
+        { "type": "test", "name": "standard" }
+      ]
+    }
+  ]
+}
