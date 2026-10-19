@@ -15,3 +15,4 @@
 ## Comments
 
 - Aus dem Review von 01: In 01 wirkt nur die Radlast entlang der Bodennormalen, der Reibwert wird noch nicht gelesen. „Kein Wegrutschen“ aus 01 ist deshalb erst mit Reifenkräften wirklich geprüft. Den Stand-Test aus `tests/stand_test.cpp` hier erneut grün bekommen. Ebenso kommen hier die 8 Zwischenschritte und die über den Schritt gemittelten Kräfte (Spec, Naht 2) dazu.
+- Aus 02: Die Plausibilitätsprüfung (`pruefe` in `physik/src/fahrzeugdatei.cpp`) kennt noch keine Reifen. Sobald die Reifen-Koeffizienten in die Fahrzeugdatei kommen, dort „Reifen ohne Grip“ (Spitzenreibwert ≤ 0) und unsinnige Koeffizienten ablehnen und in `tests/fahrzeugdatei_test.cpp` mittesten.
