@@ -4,6 +4,8 @@
 #include <cmath>
 #include <numbers>
 
+#include "magic_formula.h"
+
 namespace ultragravity {
 namespace {
 
@@ -85,22 +87,6 @@ double schlupfnenner(double v) { return std::sqrt(v * v + schlupfnenner_minimum 
 // Längsschlupf eines Rads mit Drehzahl omega (rad/s) und Radradius r (m) bei der
 // Längsgeschwindigkeit v (m/s) im Kontaktpunkt. Einheitenlos.
 double laengsschlupf(double omega, double r, double v) { return (omega * r - v) / schlupfnenner(v); }
-
-// Magic Formula über einem Schlupf, normiert auf den Spitzenwert 1, samt ihrer
-// Ableitung nach dem Schlupf.
-struct Kurvenpunkt {
-    double wert;
-    double steigung;
-};
-
-Kurvenpunkt magic_formula(const Kurvenform& k, double schlupf) {
-    const double b = k.steifigkeit;
-    const double bx = b * schlupf;
-    const double phi = bx - k.kruemmung * (bx - std::atan(bx));
-    const double dphi = b - k.kruemmung * (b - b / (1.0 + bx * bx));
-    const double winkel = k.form * std::atan(phi);
-    return {std::sin(winkel), std::cos(winkel) * k.form / (1.0 + phi * phi) * dphi};
-}
 
 // Gewichtungsfunktion für kombinierten Schlupf: 1 ohne den anderen Schlupf,
 // fällt mit ihm gegen null.
