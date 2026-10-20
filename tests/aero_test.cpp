@@ -10,6 +10,9 @@ using namespace ultragravity::test;
 
 namespace {
 
+// Eigener Oracle-Wert, bewusst nicht aus dem Physikpaket übernommen.
+constexpr double luftdichte = 1.2; // kg/m³
+
 constexpr double erdbeschleunigung = Testwelt::erdbeschleunigung; // m/s²
 
 double abtriebskraft(double flaeche, double v) { return 0.5 * luftdichte * flaeche * v * v; } // N
