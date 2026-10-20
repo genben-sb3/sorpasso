@@ -3,7 +3,7 @@
 #include <cmath>
 
 // Small vector and quaternion math. SI units, axes per ISO 8855
-// (X forward, Y left, Z up, right-handed), see ADR-0004.
+// (X forward, Y left, Z up, right-handed), see ADR 0006.
 namespace ultragravity {
 
 struct Vec3 {
