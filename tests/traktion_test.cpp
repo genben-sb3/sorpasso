@@ -86,7 +86,7 @@ TEST_CASE("Stufe 0 verhält sich genau wie ohne Traktionskontrolle") {
     CHECK(pruefsumme(aus.letzter_schritt().zustand, aus.karosserie()) ==
           pruefsumme(stufe0.letzter_schritt().zustand, stufe0.karosserie()));
     // Und sie dreht ohne Hilfe merklich durch, sonst bewiese der Vergleich nichts.
-    CHECK(vollgas(0).spitzenschlupf > 0.3);
+    CHECK(vollgas(0).spitzenschlupf > 1.0); // gemessen: etwa 7
 }
 
 TEST_CASE("Die Traktionskontrolle pendelt nicht") {
@@ -94,8 +94,10 @@ TEST_CASE("Die Traktionskontrolle pendelt nicht") {
         const Vollgasfahrt f = vollgas(stufe);
         CAPTURE(stufe);
         CAPTURE(f.richtungswechsel);
+        // Gemessen: höchstens 5 Wechsel in 4 s (Abregeln, Halten, Aufregeln); ein
+        // Schalten an und aus je Tick läge bei über 100.
         CHECK(f.richtungswechsel <= 6);
         // Sie bremst nicht ins Leere: Das Auto kommt mit ihr voran.
-        CHECK(f.geschwindigkeit > 5.0);
+        CHECK(f.geschwindigkeit > 6.0);
     }
 }

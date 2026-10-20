@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <numbers>
 #include <cstdint>
 #include <numbers>
 #include <optional>
@@ -14,8 +13,8 @@
 namespace ultragravity::test {
 
 inline constexpr double hundert_kmh = 100.0 / 3.6; // m/s
-inline constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
 
+inline constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
 
 inline double drehzahl(const Testwelt& welt) { return welt.letzter_schritt().animationsdaten.drehzahl; }
 
