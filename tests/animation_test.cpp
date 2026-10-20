@@ -176,7 +176,9 @@ TEST_CASE("Die Interpolation zwischen echten Ticks ist stetig") {
 TEST_CASE("Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft") {
     // Die Luft wirkt auch ohne Bodenkontakt; hier geht es um die Reifen, also ohne Aero.
     Kennwerte kennwerte = sportcoupe();
-    kennwerte.aero.luftwiderstand = 1e-9;
+    // Die Plausibilitätsprüfung verlangt positive Werte; dieser ist klein genug, um Aero zu vernachlässigen.
+    constexpr double vernachlaessigbarer_luftwiderstand = 1e-9; // m²
+    kennwerte.aero.luftwiderstand = vernachlaessigbarer_luftwiderstand;
     kennwerte.vorn.abtrieb = 0.0;
     kennwerte.hinten.abtrieb = 0.0;
     // Ein Sperrdifferenzial würde das Rad in der Luft über die Vorspannung mitziehen.
