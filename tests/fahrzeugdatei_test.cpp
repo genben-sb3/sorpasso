@@ -269,3 +269,40 @@ TEST_CASE("Eine Fahrzeugdatei, deren Wurzel kein Objekt ist, wird als solche gem
     CHECK(ergebnis.fehler->feld == "");
     CHECK(ergebnis.fehler->meldung == "ist kein Objekt");
 }
+
+TEST_CASE("Das Sportcoupé trägt Aero- und Rollwiderstandswerte") {
+    const LadeErgebnis ergebnis = lade_fahrzeugdatei(sportcoupe_pfad);
+
+    REQUIRE_FALSE(ergebnis.fehler.has_value());
+    const Kennwerte& auto_ = ergebnis.kennwerte;
+    CHECK(auto_.aero.luftwiderstand == doctest::Approx(0.72));
+    CHECK(auto_.vorn.abtrieb > 0.0);
+    CHECK(auto_.hinten.abtrieb > auto_.vorn.abtrieb);
+    CHECK(auto_.hinten.reifen.rollwiderstand == doctest::Approx(0.012));
+}
+
+TEST_CASE("Fehlende oder unplausible Aero- und Rollwiderstandswerte werden mit ihrem Pfad gemeldet") {
+    nlohmann::json j = sportcoupe();
+    std::string erwartetes_feld;
+
+    SUBCASE("kein aero-Objekt") {
+        j.erase("aero");
+        erwartetes_feld = "aero";
+    }
+    SUBCASE("negativer Abtrieb") {
+        j["achsen"]["vorn"]["abtrieb"] = -0.1;
+        erwartetes_feld = "achsen.vorn.abtrieb";
+    }
+    SUBCASE("Luftwiderstand null") {
+        j["aero"]["luftwiderstand"] = 0.0;
+        erwartetes_feld = "aero.luftwiderstand";
+    }
+    SUBCASE("absurder Rollwiderstand") {
+        j["achsen"]["hinten"]["reifen"]["rollwiderstand"] = 1.2;
+        erwartetes_feld = "achsen.hinten.reifen.rollwiderstand";
+    }
+
+    const LadeErgebnis ergebnis = lies(j);
+    REQUIRE(ergebnis.fehler.has_value());
+    CHECK(ergebnis.fehler->feld == erwartetes_feld);
+}

@@ -7,6 +7,7 @@ add_executable(ultragravity_tests
   antrieb_test.cpp
   kurven_test.cpp
   animation_test.cpp
+  aero_test.cpp
 )
 target_include_directories(ultragravity_tests PRIVATE ${PROJECT_SOURCE_DIR}/third_party)
 target_link_libraries(ultragravity_tests PRIVATE ultragravity::testwelt)

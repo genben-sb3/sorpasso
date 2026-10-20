@@ -12,69 +12,10 @@ using namespace ultragravity::test;
 
 namespace {
 
-constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
-
-double drehzahl(const Testwelt& welt) { return welt.letzter_schritt().animationsdaten.drehzahl; }
-
 double hinterachsdrehzahl(const Testwelt& welt) {
     const auto& omega = welt.letzter_schritt().zustand.raddrehzahl;
     return (omega[hinten_links] + omega[hinten_rechts]) / 2.0;
 }
-
-// Fährt an und schaltet kurz vor dem Begrenzer hoch: Kupplung treten, Gas weg,
-// nächster Gang, nach der Schaltzeit die Kupplung zügig kommen lassen. In den
-// unteren Gängen gibt er nur so viel Gas, dass die Hinterräder kaum durchdrehen.
-class Testfahrer {
-public:
-    static constexpr double einlegen = 0.3;         // s Kupplung getreten vor dem Anfahren
-    static constexpr double kupplung_anfahren = 0.5; // s zum Kommenlassen beim Anfahren
-    static constexpr double kupplung_schalten = 0.15; // s zum Kommenlassen nach dem Schalten
-    static constexpr double schaltdrehzahl = 6800.0 * u_min;
-    static constexpr std::array<double, 3> gas_untere_gaenge{0.75, 0.95, 1.0}; // 1
-
-    explicit Testfahrer(const Kennwerte& k)
-        : gaenge_(static_cast<int>(k.antrieb.getriebe.uebersetzungen.size())),
-          schaltpause_(k.antrieb.getriebe.schaltzeit + 0.05) {}
-
-    EingabePaket paket(const Testwelt& welt) {
-        EingabePaket p;
-        p.gangwunsch = static_cast<std::int8_t>(gang_);
-        if (zeit_ < einlegen) {
-            p.kupplung = 1.0;
-        } else if (zeit_ < einlegen + kupplung_anfahren) {
-            p.gas = gas();
-            p.kupplung = 1.0 - (zeit_ - einlegen) / kupplung_anfahren;
-        } else {
-            const double seit_schalten = zeit_ - geschaltet_;
-            if (gang_ < gaenge_ && seit_schalten > schaltpause_ + kupplung_schalten &&
-                drehzahl(welt) > schaltdrehzahl) {
-                ++gang_;
-                geschaltet_ = zeit_;
-                p.gangwunsch = static_cast<std::int8_t>(gang_);
-                p.kupplung = 1.0;
-            } else if (seit_schalten < schaltpause_) {
-                p.kupplung = 1.0;
-            } else {
-                p.gas = gas();
-                p.kupplung = std::max(1.0 - (seit_schalten - schaltpause_) / kupplung_schalten, 0.0);
-            }
-        }
-        zeit_ += Testwelt::zeitschritt;
-        return p;
-    }
-
-    int gang() const { return gang_; }
-    bool eingekuppelt() const { return zeit_ - geschaltet_ > schaltpause_ + kupplung_schalten; }
-
-private:
-    double gas() const { return gang_ <= 3 ? gas_untere_gaenge[gang_ - 1] : 1.0; }
-
-    int gaenge_;
-    double schaltpause_; // s
-    int gang_ = 1;
-    double zeit_ = 0.0;        // s seit Beginn des Anfahrens
-    double geschaltet_ = -1e9; // s, Zeitpunkt des letzten Gangwechsels
-};
 
 } // namespace
 
@@ -101,8 +42,10 @@ TEST_CASE("Im Leerlauf und bei getretener Kupplung hält der Motor seine Leerlau
             fahrt.einen_tick(getreten);
             CHECK(drehzahl(welt) == doctest::Approx(leerlauf).epsilon(0.02));
         }
-        // Ohne Kraftschluss bremst der Motor das Auto nicht.
-        CHECK(laengsgeschwindigkeit(welt) == doctest::Approx(hundert_kmh).epsilon(0.01));
+        // Ohne Kraftschluss bremst der Motor das Auto nicht; nur die Fahrwiderstände
+        // kosten in 3 s rund 1 m/s (siehe aero_test.cpp).
+        CHECK(laengsgeschwindigkeit(welt) < hundert_kmh);
+        CHECK(laengsgeschwindigkeit(welt) > hundert_kmh - 1.5);
     }
 }
 
@@ -125,7 +68,7 @@ TEST_CASE("Das Auto fährt aus dem Stand an, schaltet bis in den sechsten Gang u
     // Untere Grenze: Die Hinterachse überträgt höchstens μ mal ihre dynamische
     // Last, a = μ·g·l_v / (L − μ·h). Ein echtes Auto mit 300 PS und 1350 kg
     // braucht rund 5 s. Das Band nach oben ist bewusst weit, weil der Testfahrer
-    // grob anfährt und Fahrwiderstände noch fehlen; schärfer wird es mit dem
+    // grob anfährt; schärfer wird es mit dem
     // Testmanöver in 09 und den Zielwerten in 18.
     const double mu = auto_.hinten.reifen.spitzenreibwert;
     const double radstand = auto_.vorn.x - auto_.hinten.x;
@@ -181,7 +124,6 @@ TEST_CASE("Gas weg im Gang bremst das Auto über die Motorbremse") {
     dritter.kupplung = 0.0;
     fahrt_im_leerlauf.fahre(1.0);
 
-    const double v_im_gang = laengsgeschwindigkeit(im_gang);
     for (int tick = 0; tick < Fahrt::ticks(2.0); ++tick) {
         const double v_vorher = laengsgeschwindigkeit(im_gang);
         fahrt_im_gang.einen_tick(dritter);
@@ -189,10 +131,9 @@ TEST_CASE("Gas weg im Gang bremst das Auto über die Motorbremse") {
         CHECK(laengsgeschwindigkeit(im_gang) < v_vorher);
     }
 
-    // Ohne Fahrwiderstände rollt das Auto im Leerlauf ungebremst weiter.
-    CHECK(laengsgeschwindigkeit(im_leerlauf) == doctest::Approx(hundert_kmh).epsilon(0.01));
-    // Rund 670 N Schleppkraft bei 4600 U/min verzögern um etwa 0,45 m/s².
-    CHECK(v_im_gang - laengsgeschwindigkeit(im_gang) > 0.5);
+    // Rund 670 N Schleppkraft bei 4600 U/min verzögern um etwa 0,45 m/s² mehr als
+    // die Fahrwiderstände im Leerlauf.
+    CHECK(laengsgeschwindigkeit(im_leerlauf) - laengsgeschwindigkeit(im_gang) > 0.5);
 }
 
 TEST_CASE("Mit zu viel Gas beim Anfahren drehen die Hinterräder durch") {

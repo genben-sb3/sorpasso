@@ -127,6 +127,7 @@ struct Radlage {
     Vec3 laengs;                 // 1, Rollrichtung in der Bodenebene
     Vec3 quer;                   // 1, in der Bodenebene nach links, quer zur Rollrichtung
     Vec3 v_kontakt;              // m/s, Geschwindigkeit der Karosserie im Kontaktpunkt
+    double radlast = 0.0;        // N
     double haftkraft = 0.0;      // N, Radlast mal Reibwert
     double bremsmoment = 0.0;    // N·m
 };
@@ -259,10 +260,32 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
 
         richte_aus(rad, kontakt.normale, vorn, vorderrad(i) ? lenkwinkel_vorn : 0.0);
         rad.v_kontakt = karosserie.geschwindigkeit + kreuz(karosserie.drehgeschwindigkeit, rad.hebel);
+        rad.radlast = radlast;
         rad.haftkraft = radlast * reibwert(rad.achse->reifen, radlast, kontakt.reibwert);
+
+        // Rollwiderstand: proportional zur Radlast, gegen die Rollrichtung. Der
+        // glatte Vorzeichenübergang hält ihn im Stand bei null.
+        const double vx = skalar(rad.v_kontakt, rad.laengs); // m/s
+        const Vec3 rollkraft = rad.laengs * (-rad.achse->reifen.rollwiderstand * radlast * vx / schlupfnenner(vx));
+        ergebnis.kraefte.kraft += rollkraft;
+        ergebnis.kraefte.moment += kreuz(rad.hebel, rollkraft);
 
         ergebnis.animationsdaten.federweg[i] = federungen[i].einfederung;
         ergebnis.telemetrie.radlast[i] = radlast;
+    }
+
+    // Luft: Der Widerstand wirkt gegen die Fahrtrichtung im Schwerpunkt, der
+    // Abtrieb je Achse senkrecht zur Karosserie nach unten an der Achsposition.
+    const double staudruck_faktor = 0.5 * luftdichte; // kg/m³
+    ergebnis.kraefte.kraft +=
+        karosserie.geschwindigkeit * (-staudruck_faktor * kennwerte.aero.luftwiderstand * betrag(karosserie.geschwindigkeit));
+    const double fahrtwind = std::max(skalar(karosserie.geschwindigkeit, vorn), 0.0); // m/s
+    for (const Achse* achse : {&kennwerte.vorn, &kennwerte.hinten}) {
+        const Vec3 abtrieb = drehe(karosserie.ausrichtung, {0.0, 0.0, -1.0}) *
+                             (staudruck_faktor * achse->abtrieb * fahrtwind * fahrtwind); // N
+        const Vec3 hebel = drehe(karosserie.ausrichtung, Vec3{achse->x, 0.0, 0.0} - kennwerte.schwerpunkt);
+        ergebnis.kraefte.kraft += abtrieb;
+        ergebnis.kraefte.moment += kreuz(hebel, abtrieb);
     }
 
     // Räder und Reifen in Zwischenschritten. Radlast, Kontaktpunkt und Drehung der

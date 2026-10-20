@@ -174,7 +174,11 @@ TEST_CASE("Die Interpolation zwischen echten Ticks ist stetig") {
 }
 
 TEST_CASE("Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft") {
-    const Kennwerte kennwerte = sportcoupe();
+    // Die Luft wirkt auch ohne Bodenkontakt; hier geht es um die Reifen, also ohne Aero.
+    Kennwerte kennwerte = sportcoupe();
+    kennwerte.aero.luftwiderstand = 1e-9;
+    kennwerte.vorn.abtrieb = 0.0;
+    kennwerte.hinten.abtrieb = 0.0;
     Karosseriebewegung karosserie;
     karosserie.position = {0.0, 0.0, 0.5};
     karosserie.geschwindigkeit = {20.0, 3.0, 0.0};
@@ -187,12 +191,12 @@ TEST_CASE("Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft
     Radkontakte luft = kontakte;
     for (Radkontakt& k : luft) k.kontakt = false;
     const SchrittErgebnis frei = fahrzeugschritt(zustand, kennwerte, eingabe, luft, karosserie, 1.0 / 120.0);
-    CHECK(frei.kraefte.kraft.x == 0.0);
-    CHECK(frei.kraefte.kraft.y == 0.0);
-    CHECK(frei.kraefte.kraft.z == 0.0);
-    CHECK(frei.kraefte.moment.x == 0.0);
-    CHECK(frei.kraefte.moment.y == 0.0);
-    CHECK(frei.kraefte.moment.z == 0.0);
+    CHECK(std::abs(frei.kraefte.kraft.x) < 1e-6);
+    CHECK(std::abs(frei.kraefte.kraft.y) < 1e-6);
+    CHECK(std::abs(frei.kraefte.kraft.z) < 1e-6);
+    CHECK(std::abs(frei.kraefte.moment.x) < 1e-6);
+    CHECK(std::abs(frei.kraefte.moment.y) < 1e-6);
+    CHECK(std::abs(frei.kraefte.moment.z) < 1e-6);
     for (int i = 0; i < anzahl_raeder; ++i) {
         CHECK(frei.animationsdaten.federweg[i] == 0.0);
         CHECK(frei.telemetrie.radlast[i] == 0.0);

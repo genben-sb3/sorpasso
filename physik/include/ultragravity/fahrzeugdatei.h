@@ -39,6 +39,7 @@ struct Reifen {
     double nennlast = 0.0;            // N
     double lastempfindlichkeit = 0.0; // Verlust an Reibwert (relativ) je Nennlast Mehrlast
     double traegheit = 0.0;           // kg·m², Rad und Reifen um die Drehachse
+    double rollwiderstand = 0.0;      // 1, Rollwiderstandskraft je Newton Radlast
     double relaxationslaenge = 0.0;   // m Rollstrecke, bis die Seitenkraft 63 % erreicht
     Kurvenform laengs;                // über dem Längsschlupf κ (dimensionslos)
     Kurvenform quer;                  // über dem Schräglaufwinkel α in rad
@@ -51,6 +52,7 @@ struct Achse {
     double spurweite = 0.0;   // m
     double anlenkhoehe = 0.0; // m, Höhe des oberen Federbein-Anlenkpunkts
     double radradius = 0.0;   // m
+    double abtrieb = 0.0;     // m², Auftriebsbeiwert mal Fläche (cL·A) der Achse, positiv drückt nach unten
     Fahrwerk fahrwerk;
     Reifen reifen;
 };
@@ -95,6 +97,10 @@ struct Antrieb {
     Getriebe getriebe;
 };
 
+struct Aero {
+    double luftwiderstand = 0.0; // m², Widerstandsbeiwert mal Stirnfläche (cW·A)
+};
+
 // Alle Kennwerte eines Autos. Alle Positionen liegen im selben Fahrzeugsystem
 // (ISO 8855); dessen Ursprung ist frei, üblich ist die Mitte der Vorderachse
 // auf Bodenhöhe in Konstruktionslage.
@@ -105,6 +111,7 @@ struct Kennwerte {
     Vec3 schwerpunkt;    // m
     Achse vorn;
     Achse hinten;
+    Aero aero;
     Lenkung lenkung;
     Bremsen bremsen;
     Antrieb antrieb;
