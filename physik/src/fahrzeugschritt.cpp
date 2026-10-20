@@ -24,6 +24,25 @@ std::array<Radaufhaengung, anzahl_raeder> radaufhaengungen(const Kennwerte& k) {
     }};
 }
 
+// Dichte der Luft, aus der Luftwiderstand und Abtrieb ihre Kraft ziehen.
+constexpr double luftdichte = 1.2; // kg/m³
+
+// Luft: Der Widerstand wirkt gegen die Fahrtrichtung im Schwerpunkt, der
+// Abtrieb je Achse senkrecht zur Karosserie nach unten an der Achsposition.
+void luftkraefte(const Kennwerte& kennwerte, const Karosseriebewegung& karosserie, const Vec3& vorn, Kraefte& kraefte) {
+    const double staudruck_faktor = 0.5 * luftdichte; // kg/m³
+    kraefte.kraft +=
+        karosserie.geschwindigkeit * (-staudruck_faktor * kennwerte.aero.luftwiderstand * betrag(karosserie.geschwindigkeit));
+    const double fahrtwind = std::max(skalar(karosserie.geschwindigkeit, vorn), 0.0); // m/s
+    for (const Achse* achse : {&kennwerte.vorn, &kennwerte.hinten}) {
+        const Vec3 abtrieb = drehe(karosserie.ausrichtung, {0.0, 0.0, -1.0}) *
+                             (staudruck_faktor * achse->abtrieb * fahrtwind * fahrtwind); // N
+        const Vec3 hebel = drehe(karosserie.ausrichtung, Vec3{achse->x, 0.0, 0.0} - kennwerte.schwerpunkt);
+        kraefte.kraft += abtrieb;
+        kraefte.moment += kreuz(hebel, abtrieb);
+    }
+}
+
 bool vorderrad(int rad) { return rad < hinten_links; }
 
 // Das andere Rad derselben Achse.
@@ -375,19 +394,7 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
         ergebnis.telemetrie.radlast[i] = radlast;
     }
 
-    // Luft: Der Widerstand wirkt gegen die Fahrtrichtung im Schwerpunkt, der
-    // Abtrieb je Achse senkrecht zur Karosserie nach unten an der Achsposition.
-    const double staudruck_faktor = 0.5 * luftdichte; // kg/m³
-    ergebnis.kraefte.kraft +=
-        karosserie.geschwindigkeit * (-staudruck_faktor * kennwerte.aero.luftwiderstand * betrag(karosserie.geschwindigkeit));
-    const double fahrtwind = std::max(skalar(karosserie.geschwindigkeit, vorn), 0.0); // m/s
-    for (const Achse* achse : {&kennwerte.vorn, &kennwerte.hinten}) {
-        const Vec3 abtrieb = drehe(karosserie.ausrichtung, {0.0, 0.0, -1.0}) *
-                             (staudruck_faktor * achse->abtrieb * fahrtwind * fahrtwind); // N
-        const Vec3 hebel = drehe(karosserie.ausrichtung, Vec3{achse->x, 0.0, 0.0} - kennwerte.schwerpunkt);
-        ergebnis.kraefte.kraft += abtrieb;
-        ergebnis.kraefte.moment += kreuz(hebel, abtrieb);
-    }
+    luftkraefte(kennwerte, karosserie, vorn, ergebnis.kraefte);
 
     // Räder und Reifen in Zwischenschritten. Radlast, Kontaktpunkt und Drehung der
     // Karosserie bleiben dabei fest. Bewusste Näherung: Nur die Geschwindigkeit der
