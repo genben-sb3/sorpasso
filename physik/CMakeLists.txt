@@ -1,4 +1,5 @@
 add_library(ultragravity_physik
+  src/animationsdaten.cpp
   src/fahrzeugdatei.cpp
   src/fahrzeugschritt.cpp
   src/pruefsumme.cpp
