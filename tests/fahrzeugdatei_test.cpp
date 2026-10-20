@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
 #include <numbers>
 #include <sstream>
 #include <string>
@@ -268,4 +269,110 @@ TEST_CASE("Eine Fahrzeugdatei, deren Wurzel kein Objekt ist, wird als solche gem
     REQUIRE(ergebnis.fehler.has_value());
     CHECK(ergebnis.fehler->feld == "");
     CHECK(ergebnis.fehler->meldung == "ist kein Objekt");
+}
+
+TEST_CASE("Das Sportcoupé hat Heckantrieb, Handschaltung und ein Sperrdifferenzial") {
+    const LadeErgebnis ergebnis = lade_fahrzeugdatei(sportcoupe_pfad);
+
+    REQUIRE_FALSE(ergebnis.fehler.has_value());
+    const Antrieb& antrieb = ergebnis.kennwerte.antrieb;
+    CHECK(antrieb.art == Antriebsart::heck);
+    CHECK(antrieb.getriebe.modus == Getriebemodus::manuell);
+    CHECK(antrieb.differenzial.sperrt);
+    CHECK(antrieb.differenzial.vorspannung > 0.0);
+}
+
+namespace {
+
+nlohmann::json automatik_block() {
+    return {{"hochschalt_u_min", 6500.0},       {"runterschalt_u_min", 2500.0}, {"bremsschalt_u_min", 4000.0},
+            {"haltezeit", 0.8},                 {"einkuppelbereich_u_min", 1500.0},
+            {"einkuppelzeit", 0.15},            {"driftwinkel_grad", 10.0}};
+}
+
+} // namespace
+
+TEST_CASE("Front-, Allradantrieb und Automatik laden, wenn die Datei sie vollständig beschreibt") {
+    nlohmann::json j = sportcoupe();
+    j["antrieb"]["art"] = "allrad";
+    j["antrieb"]["momentverteilung_vorn"] = 0.4;
+    j["antrieb"]["differenzial"] = {{"art", "offen"}};
+    j["antrieb"]["getriebe"]["modus"] = "automatik";
+    j["antrieb"]["getriebe"]["automatik"] = automatik_block();
+
+    const LadeErgebnis ergebnis = lies(j);
+
+    REQUIRE_FALSE(ergebnis.fehler.has_value());
+    CHECK(ergebnis.kennwerte.antrieb.art == Antriebsart::allrad);
+    CHECK(ergebnis.kennwerte.antrieb.momentverteilung_vorn == doctest::Approx(0.4));
+    CHECK_FALSE(ergebnis.kennwerte.antrieb.differenzial.sperrt);
+    CHECK(ergebnis.kennwerte.antrieb.getriebe.modus == Getriebemodus::automatik);
+
+    j["antrieb"]["art"] = "front";
+    j["antrieb"].erase("momentverteilung_vorn");
+    CHECK_FALSE(lies(j).fehler.has_value());
+}
+
+TEST_CASE("Ungültige Kombinationen aus Antriebsart, Differenzial und Getriebemodus werden verständlich abgelehnt") {
+    using nlohmann::json;
+    struct Fall {
+        const char* beschreibung;
+        std::function<void(json&)> aendere;
+        const char* feld;
+        const char* meldung;
+    };
+    const Fall faelle[] = {
+        {"unbekannte Antriebsart", [](json& j) { j["antrieb"]["art"] = "mittelmotor"; }, "antrieb.art",
+         "muss \"heck\", \"front\" oder \"allrad\" sein"},
+        {"Allrad ohne Momentverteilung", [](json& j) { j["antrieb"]["art"] = "allrad"; },
+         "antrieb.momentverteilung_vorn", "fehlt"},
+        {"Allrad mit Momentverteilung 1",
+         [](json& j) {
+             j["antrieb"]["art"] = "allrad";
+             j["antrieb"]["momentverteilung_vorn"] = 1.0;
+         },
+         "antrieb.momentverteilung_vorn",
+         "muss zwischen keinem Moment vorn (0) und keinem Moment hinten (1) liegen"},
+        {"Momentverteilung ohne Allrad", [](json& j) { j["antrieb"]["momentverteilung_vorn"] = 0.5; },
+         "antrieb.momentverteilung_vorn", "gibt es nur beim Allradantrieb"},
+        {"unbekanntes Differenzial", [](json& j) { j["antrieb"]["differenzial"]["art"] = "torsen"; },
+         "antrieb.differenzial.art", "muss \"offen\" oder \"sperre\" sein"},
+        {"Sperre ohne Wirkung",
+         [](json& j) {
+             j["antrieb"]["differenzial"]["vorspannung"] = 0.0;
+             j["antrieb"]["differenzial"]["sperrwirkung"] = 0.0;
+         },
+         "antrieb.differenzial.art",
+         "ein Sperrdifferenzial braucht Vorspannung oder Sperrwirkung, sonst ist es offen"},
+        {"offenes Differenzial mit Vorspannung",
+         [](json& j) { j["antrieb"]["differenzial"] = {{"art", "offen"}, {"vorspannung", 50.0}}; },
+         "antrieb.differenzial.vorspannung", "gibt es nur beim Sperrdifferenzial"},
+        {"unbekannter Getriebemodus", [](json& j) { j["antrieb"]["getriebe"]["modus"] = "doppelkupplung"; },
+         "antrieb.getriebe.modus", "muss \"manuell\" oder \"automatik\" sein"},
+        {"Automatik ohne Schaltpunkte", [](json& j) { j["antrieb"]["getriebe"]["modus"] = "automatik"; },
+         "antrieb.getriebe.automatik", "fehlt"},
+        {"Schaltpunkte ohne Automatik", [](json& j) { j["antrieb"]["getriebe"]["automatik"] = automatik_block(); },
+         "antrieb.getriebe.automatik", "gibt es nur im Getriebemodus automatik"},
+        {"Automatik, die pendeln würde",
+         [](json& j) {
+             j["antrieb"]["getriebe"]["modus"] = "automatik";
+             j["antrieb"]["getriebe"]["automatik"] = automatik_block();
+             j["antrieb"]["getriebe"]["automatik"]["runterschalt_u_min"] = 5000.0;
+             j["antrieb"]["getriebe"]["automatik"]["bremsschalt_u_min"] = 5500.0;
+         },
+         "antrieb.getriebe.automatik.runterschalt_u_min",
+         "muss unter der Drehzahl liegen, auf die das Hochschalten fällt (4468.75), sonst pendelt die Automatik"},
+    };
+
+    for (const Fall& fall : faelle) {
+        CAPTURE(fall.beschreibung);
+        json j = sportcoupe();
+        fall.aendere(j);
+
+        const LadeErgebnis ergebnis = lies(j);
+
+        REQUIRE(ergebnis.fehler.has_value());
+        CHECK(ergebnis.fehler->feld == fall.feld);
+        CHECK(ergebnis.fehler->meldung == fall.meldung);
+    }
 }

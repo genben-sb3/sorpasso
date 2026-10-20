@@ -185,6 +185,76 @@ Reifenkraft reifenkraft(const Radlage& rad, Vec3 v, double omega, double h, doub
     return k;
 }
 
+// Eine angetriebene Achse samt ihrem Anteil am Antriebsmoment.
+struct Antriebsachse {
+    int links;
+    int rechts;
+    const Achse* achse;
+    double anteil; // 1
+};
+
+struct Antriebsachsen {
+    std::array<Antriebsachse, 2> achsen{};
+    int anzahl = 0;
+};
+
+Antriebsachsen antriebsachsen(const Kennwerte& k) {
+    const Antriebsachse vorn{vorn_links, vorn_rechts, &k.vorn, 1.0};
+    const Antriebsachse hinten{hinten_links, hinten_rechts, &k.hinten, 1.0};
+    const Antrieb& a = k.antrieb;
+    switch (a.art) {
+    case Antriebsart::heck: return {{hinten, {}}, 1};
+    case Antriebsart::front: return {{vorn, {}}, 1};
+    case Antriebsart::allrad: break;
+    }
+    Antriebsachse v = vorn;
+    Antriebsachse h = hinten;
+    v.anteil = a.momentverteilung_vorn;
+    h.anteil = 1.0 - a.momentverteilung_vorn;
+    return {{v, h}, 2};
+}
+
+// Mittlerer Radradius der angetriebenen Achsen, gewichtet mit ihrem Anteil.
+double antriebsradius(const Antriebsachsen& angetrieben) {
+    double radius = 0.0; // m
+    for (int i = 0; i < angetrieben.anzahl; ++i) {
+        radius += angetrieben.achsen[i].anteil * angetrieben.achsen[i].achse->radradius;
+    }
+    return radius;
+}
+
+double gesamtuebersetzung(const Antrieb& a, int gang) {
+    return gang > 0 ? a.getriebe.uebersetzungen[gang - 1] * a.getriebe.achsuebersetzung : 0.0;
+}
+
+// Der Gang, den die Automatik als nächsten wählt. Sie rechnet mit der Drehzahl,
+// die zur Geschwindigkeit über Grund gehört: Durchdrehende Räder treiben sie
+// nicht in den nächsten Gang. Im Drift hält sie den Gang.
+int automatikgang(const Zustand& zustand, const Kennwerte& k, double bremse, Vec3 geschwindigkeit_fahrzeug,
+                  double radius) {
+    const Antrieb& a = k.antrieb;
+    const Automatik& au = a.getriebe.automatik;
+    const int gaenge = static_cast<int>(a.getriebe.uebersetzungen.size());
+    const int gang = zustand.gang == 0 ? 1 : zustand.gang;
+    if (zustand.gang == 0) return gang;
+    if (zustand.gangalter < au.haltezeit) return gang;
+
+    const double vx = geschwindigkeit_fahrzeug.x; // m/s
+    const double vy = geschwindigkeit_fahrzeug.y; // m/s
+    constexpr double driftgeschwindigkeit = 2.0;  // m/s, darunter gibt es keinen Driftwinkel
+    if (std::hypot(vx, vy) > driftgeschwindigkeit && std::atan2(std::abs(vy), std::abs(vx)) > au.driftwinkel) {
+        return gang;
+    }
+
+    const auto bodendrehzahl = [&](int g) { return std::abs(vx) / radius * gesamtuebersetzung(a, g); }; // rad/s
+    if (gang < gaenge && bremse < 0.05 && bodendrehzahl(gang) > au.hochschaltdrehzahl) return gang + 1;
+    const double runter = bremse >= 0.05 ? au.bremsschaltdrehzahl : au.runterschaltdrehzahl;
+    if (gang > 1 && bodendrehzahl(gang) < runter && bodendrehzahl(gang - 1) < au.hochschaltdrehzahl) {
+        return gang - 1;
+    }
+    return gang;
+}
+
 } // namespace
 
 Zustand rollender_zustand(const Kennwerte& kennwerte, double geschwindigkeit) {
@@ -270,27 +340,48 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     // Gangwechsel: Der gewünschte Gang greift erst nach der Schaltzeit, bis dahin
     // gibt es keinen Kraftschluss. Den Rückwärtsgang gibt es noch nicht.
     const Antrieb& antrieb = kennwerte.antrieb;
+    const Antriebsachsen angetrieben = antriebsachsen(kennwerte);
+    const bool automatik = antrieb.getriebe.modus == Getriebemodus::automatik;
     const int gaenge = static_cast<int>(antrieb.getriebe.uebersetzungen.size());
-    const int gangwunsch = std::clamp(static_cast<int>(eingabe.gangwunsch), 0, gaenge);
+    ergebnis.zustand.gangalter += dt;
+    int gangwunsch = std::clamp(static_cast<int>(eingabe.gangwunsch), 0, gaenge);
+    if (automatik) {
+        // Die Automatik kennt nur Leerlauf (0) und Fahren (alles darüber).
+        const Vec3 v_fahrzeug{skalar(karosserie.geschwindigkeit, vorn),
+                              skalar(karosserie.geschwindigkeit, drehe(karosserie.ausrichtung, {0.0, 1.0, 0.0})),
+                              0.0};
+        gangwunsch = eingabe.gangwunsch > 0
+                         ? automatikgang(zustand, kennwerte, eingabe.bremse, v_fahrzeug, antriebsradius(angetrieben))
+                         : 0;
+    }
+    // Gangwechsel: Der gewünschte Gang greift erst nach der Schaltzeit, bis dahin
+    // gibt es keinen Kraftschluss. Den Rückwärtsgang gibt es noch nicht.
     if (gangwunsch != ergebnis.zustand.gang) {
         ergebnis.zustand.gang = gangwunsch;
         ergebnis.zustand.schaltrest = antrieb.getriebe.schaltzeit;
+        ergebnis.zustand.gangalter = 0.0;
     }
-    const double kupplungsmoment = antrieb.kupplung.moment * (1.0 - eingabe.kupplung); // N·m
-    // Gesamtübersetzung vom Motor zur Hinterachse; das offene Differenzial gibt
-    // beiden Hinterrädern dasselbe Moment.
-    const double uebersetzung = ergebnis.zustand.gang > 0
-                                    ? antrieb.getriebe.uebersetzungen[ergebnis.zustand.gang - 1] *
-                                          antrieb.getriebe.achsuebersetzung
-                                    : 0.0;
-    const double radtraegheit_hinten = kennwerte.hinten.reifen.traegheit;
+    const double uebersetzung = gesamtuebersetzung(antrieb, ergebnis.zustand.gang);
     double& motordrehzahl = ergebnis.zustand.motordrehzahl;
+    // Die Automatik kuppelt selbst: mit der Motordrehzahl über Leerlauf ein und
+    // nach dem Schalten innerhalb der Einkuppelzeit wieder.
+    const Automatik& au = antrieb.getriebe.automatik;
+    const double nach_schalten =
+        automatik ? std::clamp((ergebnis.zustand.gangalter - antrieb.getriebe.schaltzeit) / std::max(au.einkuppelzeit, dt), 0.0, 1.0)
+                  : 1.0; // 1
+    double traegheit_kehrwert_raeder = 0.0; // 1/(kg·m²), Räder aus Sicht eines Impulses am Getriebeeingang
+    for (int i = 0; i < angetrieben.anzahl; ++i) {
+        const Antriebsachse& a = angetrieben.achsen[i];
+        traegheit_kehrwert_raeder += a.anteil * a.anteil / (2.0 * a.achse->reifen.traegheit);
+    }
 
     const double h = dt / zwischenschritte;
     const double gewicht_zwischenschritt = 1.0 / zwischenschritte;
     Vec3 dv_karosserie; // m/s
     for (int schritt = 0; schritt < zwischenschritte; ++schritt) {
-        motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, eingabe.gas) / antrieb.motor.traegheit;
+        // Beim automatischen Schalten nimmt die Automatik das Gas weg.
+        const double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
+        motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, gas) / antrieb.motor.traegheit;
         motordrehzahl = std::max(motordrehzahl, 0.0);
 
         Vec3 reifenkraft_gesamt; // N
@@ -320,16 +411,46 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
         // Die Kupplung ist ein begrenzter Impuls, der Motor und Getriebeeingang
         // auf gleiche Drehzahl bringt: Reicht ihr Moment, haftet sie, sonst rutscht sie.
         ergebnis.zustand.schaltrest = std::max(ergebnis.zustand.schaltrest - h, 0.0);
+        double antriebsimpuls = 0.0; // N·m·s am Getriebeeingang
         if (uebersetzung > 0.0 && ergebnis.zustand.schaltrest == 0.0) {
-            const double eingang =
-                uebersetzung * (drehzahl_frei[hinten_links] + drehzahl_frei[hinten_rechts]) / 2.0;
+            const double kupplungsgrad =
+                automatik ? std::clamp((motordrehzahl - antrieb.motor.leerlaufdrehzahl) / au.einkuppelbereich, 0.0, 1.0) *
+                                nach_schalten
+                          : 1.0 - eingabe.kupplung; // 1
+            double eingang = 0.0; // rad/s
+            for (int i = 0; i < angetrieben.anzahl; ++i) {
+                const Antriebsachse& a = angetrieben.achsen[i];
+                eingang += a.anteil * (drehzahl_frei[a.links] + drehzahl_frei[a.rechts]) / 2.0;
+            }
+            eingang *= uebersetzung;
             const double kehrwert_traegheit =
-                1.0 / antrieb.motor.traegheit + uebersetzung * uebersetzung / (2.0 * radtraegheit_hinten);
-            const double grenze = kupplungsmoment * h; // N·m·s
-            const double impuls = std::clamp((motordrehzahl - eingang) / kehrwert_traegheit, -grenze, grenze);
-            motordrehzahl -= impuls / antrieb.motor.traegheit;
-            for (int i : {hinten_links, hinten_rechts}) {
-                drehzahl_frei[i] += impuls * uebersetzung / (2.0 * radtraegheit_hinten);
+                1.0 / antrieb.motor.traegheit + uebersetzung * uebersetzung * traegheit_kehrwert_raeder;
+            const double grenze = antrieb.kupplung.moment * kupplungsgrad * h; // N·m·s
+            antriebsimpuls = std::clamp((motordrehzahl - eingang) / kehrwert_traegheit, -grenze, grenze);
+            motordrehzahl -= antriebsimpuls / antrieb.motor.traegheit;
+            for (int i = 0; i < angetrieben.anzahl; ++i) {
+                const Antriebsachse& a = angetrieben.achsen[i];
+                const double dw = antriebsimpuls * uebersetzung * a.anteil / (2.0 * a.achse->reifen.traegheit); // rad/s
+                drehzahl_frei[a.links] += dw;
+                drehzahl_frei[a.rechts] += dw;
+            }
+        }
+
+        // Das Sperrdifferenzial überträgt Moment vom schnelleren auf das langsamere
+        // Rad, höchstens bis zum Sperrmoment. Wie die Kupplung ist das ein begrenzter
+        // Impuls, der die Drehzahlen angleicht.
+        if (antrieb.differenzial.sperrt) {
+            for (int i = 0; i < angetrieben.anzahl; ++i) {
+                const Antriebsachse& a = angetrieben.achsen[i];
+                const double achsmoment = std::abs(antriebsimpuls) / h * uebersetzung * a.anteil; // N·m
+                const double sperrmoment =
+                    antrieb.differenzial.vorspannung + antrieb.differenzial.sperrwirkung * achsmoment; // N·m
+                const double traegheit = a.achse->reifen.traegheit;
+                const double grenze = sperrmoment * h; // N·m·s
+                const double unterschied = drehzahl_frei[a.links] - drehzahl_frei[a.rechts];
+                const double impuls = std::clamp(unterschied * traegheit / 2.0, -grenze, grenze);
+                drehzahl_frei[a.links] -= impuls / traegheit;
+                drehzahl_frei[a.rechts] += impuls / traegheit;
             }
         }
 

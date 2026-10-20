@@ -46,6 +46,7 @@ std::uint64_t pruefsumme(const Zustand& zustand, const Karosseriebewegung& karos
     f.nimm(zustand.motordrehzahl);
     f.nimm(static_cast<double>(zustand.gang));
     f.nimm(zustand.schaltrest);
+    f.nimm(zustand.gangalter);
     return f.summe();
 }
 
