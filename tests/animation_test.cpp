@@ -174,7 +174,9 @@ TEST_CASE("Die Interpolation zwischen echten Ticks ist stetig") {
 }
 
 TEST_CASE("Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft") {
-    const Kennwerte kennwerte = sportcoupe();
+    Kennwerte kennwerte = sportcoupe();
+    // Ein Sperrdifferenzial würde das Rad in der Luft über die Vorspannung mitziehen.
+    kennwerte.antrieb.differenzial = {};
     Karosseriebewegung karosserie;
     karosserie.position = {0.0, 0.0, 0.5};
     karosserie.geschwindigkeit = {20.0, 3.0, 0.0};
