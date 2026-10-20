@@ -1,0 +1,61 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "standard",
+      "displayName": "Ninja, Debug mit Optimierung",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "pruefen",
+      "displayName": "Wie standard, plus Sanitizer, libstdc++-Assertions und -Werror",
+      "inherits": "standard",
+      "binaryDir": "${sourceDir}/build-pruefen",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-D_GLIBCXX_ASSERTIONS -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -Werror",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "standard", "configurePreset": "standard" },
+    { "name": "pruefen", "configurePreset": "pruefen" }
+  ],
+  "testPresets": [
+    {
+      "name": "standard",
+      "configurePreset": "standard",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "pruefen",
+      "configurePreset": "pruefen",
+      "output": { "outputOnFailure": true }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "standard",
+      "displayName": "Konfigurieren, bauen und alle Tests ausführen",
+      "steps": [
+        { "type": "configure", "name": "standard" },
+        { "type": "build", "name": "standard" },
+        { "type": "test", "name": "standard" }
+      ]
+    },
+    {
+      "name": "pruefen",
+      "displayName": "Wie standard, aber mit Sanitizern und -Werror (läuft im Pre-Commit-Hook)",
+      "steps": [
+        { "type": "configure", "name": "pruefen" },
+        { "type": "build", "name": "pruefen" },
+        { "type": "test", "name": "pruefen" }
+      ]
+    }
+  ]
+}

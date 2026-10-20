@@ -1,0 +1,111 @@
+{
+  "name": "Sportcoupé",
+  "masse": 1350.0,
+  "traegheit": { "x": 450.0, "y": 1900.0, "z": 2100.0 },
+  "schwerpunkt": { "x": -1.248, "y": 0.0, "z": 0.48 },
+  "achsen": {
+    "vorn": {
+      "x": 0.0,
+      "spurweite": 1.56,
+      "anlenkhoehe": 0.42,
+      "radradius": 0.33,
+      "abtrieb": 0.15,
+      "fahrwerk": {
+        "federrate": 55000.0,
+        "daempfer_druck": 3000.0,
+        "daempfer_zug": 4500.0,
+        "federweg": 0.15,
+        "anschlagrate": 500000.0,
+        "stabilisator": 25000.0
+      },
+      "reifen": {
+        "spitzenreibwert": 1.05,
+        "nennlast": 3400.0,
+        "lastempfindlichkeit": 0.1,
+        "traegheit": 1.2,
+        "rollwiderstand": 0.012,
+        "relaxationslaenge": 0.3,
+        "laengs": {
+          "steifigkeit": 10.0,
+          "form": 1.9,
+          "kruemmung": 0.97
+        },
+        "quer": {
+          "steifigkeit": 14.0,
+          "form": 1.5,
+          "kruemmung": 0.3
+        },
+        "kombiniert": { "laengs": 8.0, "quer": 10.0 }
+      }
+    },
+    "hinten": {
+      "x": -2.6,
+      "spurweite": 1.58,
+      "anlenkhoehe": 0.42,
+      "radradius": 0.33,
+      "abtrieb": 0.3,
+      "fahrwerk": {
+        "federrate": 50000.0,
+        "daempfer_druck": 2800.0,
+        "daempfer_zug": 4200.0,
+        "federweg": 0.15,
+        "anschlagrate": 500000.0,
+        "stabilisator": 12000.0
+      },
+      "reifen": {
+        "spitzenreibwert": 1.05,
+        "nennlast": 3200.0,
+        "lastempfindlichkeit": 0.1,
+        "traegheit": 1.2,
+        "rollwiderstand": 0.012,
+        "relaxationslaenge": 0.3,
+        "laengs": {
+          "steifigkeit": 10.0,
+          "form": 1.9,
+          "kruemmung": 0.97
+        },
+        "quer": {
+          "steifigkeit": 14.0,
+          "form": 1.5,
+          "kruemmung": 0.3
+        },
+        "kombiniert": { "laengs": 8.0, "quer": 10.0 }
+      }
+    }
+  },
+  "aero": { "luftwiderstand": 0.72 },
+  "lenkung": { "max_lenkwinkel_grad": 35.0 },
+  "bremsen": {
+    "moment": 7000.0,
+    "balance": 0.65
+  },
+  "antrieb": {
+    "art": "heck",
+    "differenzial": { "art": "sperre", "vorspannung": 80.0, "sperrwirkung": 0.4 },
+    "motor": {
+      "drehmoment": [
+        { "u_min": 1000.0, "moment": 250.0 },
+        { "u_min": 2000.0, "moment": 310.0 },
+        { "u_min": 3000.0, "moment": 350.0 },
+        { "u_min": 4000.0, "moment": 370.0 },
+        { "u_min": 5000.0, "moment": 370.0 },
+        { "u_min": 6000.0, "moment": 345.0 },
+        { "u_min": 6500.0, "moment": 324.0 },
+        { "u_min": 7500.0, "moment": 270.0 }
+      ],
+      "leerlauf_u_min": 900.0,
+      "hoechst_u_min": 7200.0,
+      "traegheit": 0.2,
+      "schleppmoment": 60.0
+    },
+    "kupplung": {
+      "moment": 550.0
+    },
+    "getriebe": {
+      "uebersetzungen": [3.2, 2.2, 1.6, 1.25, 1.0, 0.82],
+      "achsuebersetzung": 3.6,
+      "schaltzeit": 0.25,
+      "modus": "manuell"
+    }
+  }
+}
