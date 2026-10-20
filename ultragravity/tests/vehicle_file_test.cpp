@@ -1,13 +1,17 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <numbers>
 #include <sstream>
 #include <string>
 
+#include "drive.h"
 #include "nlohmann/json.hpp"
+#include "ultragravity/test_world.h"
 #include "ultragravity/vehicle_file.h"
 
 using namespace ultragravity;
@@ -449,4 +453,78 @@ TEST_CASE("A vehicle file with the old German field names is rejected with the f
         CHECK(result.error->field == c.field);
         CHECK(result.error->message == c.message);
     }
+}
+
+// Loading from text (#21): the Unreal adapter reads the vehicle file with
+// Unreal's file access and hands the package only the text.
+
+namespace {
+
+std::string file_text(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    std::ostringstream content;
+    content << file.rdbuf();
+    return content.str();
+}
+
+// Checksum of the car after it was set down and drove off steering, so the
+// parameters of springs, tires, steering and drivetrain all leave a trace.
+std::uint64_t checksum_after_drive(const VehicleParams& car) {
+    TestWorld world(car, 0.05);
+    test::Drive drive(world);
+    drive.run(2.0, test::drive_input(0.5, 0.0, 0.3));
+    return world.checksum();
+}
+
+// Writes the JSON tree to a file of its own, so a test can load it from a path.
+std::string write_temporary_file(const nlohmann::json& j, const char* name) {
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / name;
+    std::ofstream(path, std::ios::binary) << j.dump(2);
+    return path.string();
+}
+
+} // namespace
+
+TEST_CASE("Loading from text yields the same parameters as loading the same file from a path") {
+    const LoadResult from_path = load_vehicle_file(sports_coupe_path);
+    const LoadResult from_text = parse_vehicle_file(file_text(sports_coupe_path));
+
+    REQUIRE_FALSE(from_path.error.has_value());
+    REQUIRE_FALSE(from_text.error.has_value());
+    CHECK(from_text.params.name == from_path.params.name);
+    CHECK(checksum_after_drive(from_text.params) == checksum_after_drive(from_path.params));
+
+    // The checksum notices a single changed parameter, so the comparison above has teeth.
+    VehicleParams heavier = from_path.params;
+    heavier.mass += 1.0;
+    CHECK(checksum_after_drive(heavier) != checksum_after_drive(from_path.params));
+}
+
+TEST_CASE("An error in the text is reported with the same field path as from a path") {
+    nlohmann::json j = sports_coupe();
+    j["axles"]["front"]["tire"].erase("relaxation_length");
+    const std::string path = write_temporary_file(j, "ultragravity_vehicle_file_test_missing_field.json");
+
+    const LoadResult from_path = load_vehicle_file(path);
+    const LoadResult from_text = parse_vehicle_file(file_text(path));
+    std::filesystem::remove(path);
+
+    REQUIRE(from_path.error.has_value());
+    REQUIRE(from_text.error.has_value());
+    CHECK(from_text.error->field == "axles.front.tire.relaxation_length");
+    CHECK(from_text.error->message == "is missing");
+    CHECK(from_text.error->field == from_path.error->field);
+    CHECK(from_text.error->message == from_path.error->message);
+}
+
+TEST_CASE("A vehicle file text cut off in the middle yields a syntax error instead of crashing") {
+    // As if the host read the file only halfway.
+    const std::string text = file_text(sports_coupe_path);
+    const std::string cut = text.substr(0, text.size() / 2);
+
+    const LoadResult result = parse_vehicle_file(cut);
+
+    REQUIRE(result.error.has_value());
+    CHECK(result.error->field == "");
+    CHECK(result.error->message.starts_with("invalid JSON at line "));
 }
