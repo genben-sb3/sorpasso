@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "ultragravity/animationsdaten.h"
 #include "ultragravity/eingabe.h"
 #include "ultragravity/fahrzeugdatei.h"
 #include "ultragravity/vektor.h"
@@ -10,7 +11,6 @@ namespace ultragravity {
 
 // Reihenfolge der Räder in allen Feldern pro Rad.
 enum Rad { vorn_links = 0, vorn_rechts = 1, hinten_links = 2, hinten_rechts = 3 };
-inline constexpr int anzahl_raeder = 4;
 
 // Bewegung der Karosserie im Weltsystem, so wie sie die Testwelt oder später
 // Chaos liefert. Die Position ist die des Schwerpunkts.
@@ -47,17 +47,13 @@ struct Kraefte {
 // Vollständiger, kopierbarer Zustand des Fahrzeugmodells.
 struct Zustand {
     std::array<double, anzahl_raeder> raddrehzahl{}; // rad/s, positiv beim Vorwärtsrollen
+    std::array<double, anzahl_raeder> raddrehwinkel{}; // rad, in [-π, π)
     std::array<double, anzahl_raeder> schraeglauf{}; // rad, dem Reifen über die Relaxationslänge nachgeführt
     double motordrehzahl = 0.0;                      // rad/s
     int gang = 0;                                    // 0 Leerlauf, 1 … n Vorwärtsgänge
     double schaltrest = 0.0;                         // s, bis der Gang greift
 };
 
-
-struct Animationsdaten {
-    std::array<double, anzahl_raeder> federweg{}; // m Einfederung ab voll ausgefedert
-    double drehzahl = 0.0;                        // rad/s des Motors
-};
 
 struct Telemetrie {
     std::array<double, anzahl_raeder> radlast{}; // N
