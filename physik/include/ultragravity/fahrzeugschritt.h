@@ -57,8 +57,16 @@ struct Zustand {
 };
 
 
+// Messwerte eines Ticks zur Analyse. Sie sind reine Ausgabe und wirken nicht
+// auf die Fahrt zurück. Schlupf und Reifenkräfte sind über die Zwischenschritte
+// des Ticks gemittelt; die Kräfte wirken entlang Roll- und Querrichtung des Rads.
 struct Telemetrie {
-    std::array<double, anzahl_raeder> radlast{}; // N
+    std::array<double, anzahl_raeder> radlast{};      // N
+    std::array<double, anzahl_raeder> schlupf{};      // 1, Längsschlupf
+    std::array<double, anzahl_raeder> schraeglauf{};  // rad, am Ende des Ticks
+    std::array<double, anzahl_raeder> kraft_laengs{}; // N, Reifenkraft in Rollrichtung
+    std::array<double, anzahl_raeder> kraft_quer{};   // N, Reifenkraft quer zur Rollrichtung, positiv nach links
+    double geschwindigkeit = 0.0;                     // m/s, Karosserie in Fahrzeug-Längsrichtung
 };
 
 struct SchrittErgebnis {
