@@ -101,9 +101,9 @@ TEST_CASE("The lateral force builds up over the relaxation length") {
     REQUIRE(steady > 0.0);
 
     // First-order lag over the rolled distance: 1 − e^(−s/σ).
-    CHECK(force[0] < 0.2 * steady);
-    CHECK(force[14] / steady == doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.05));
-    CHECK(force[44] / steady == doctest::Approx(1.0 - std::exp(-3.0)).epsilon(0.02));
+    CHECK(force[0] < 0.2 * steady); // measured: 0.038·steady, band: < 0.2·steady
+    CHECK(force[14] / steady == doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.05)); // measured: +0.68 %, band: ±5 %
+    CHECK(force[44] / steady == doctest::Approx(1.0 - std::exp(-3.0)).epsilon(0.02)); // measured: +0.23 %, band: ±2 %
 }
 
 TEST_CASE("The lateral force builds up at standstill too, via a lower bound on the speed") {
@@ -119,8 +119,8 @@ TEST_CASE("The lateral force builds up at standstill too, via a lower bound on t
 
     // Without the lower bound the force would stay at zero at standstill; with it
     // it builds up with a lag, but completely.
-    CHECK(force[0] < 0.5 * steady);
-    CHECK(force[119] > 0.95 * steady);
+    CHECK(force[0] < 0.5 * steady); // measured: 0.016·steady, band: < 0.5·steady
+    CHECK(force[119] > 0.95 * steady); // measured: 0.97·steady, band: > 0.95·steady
 }
 
 TEST_CASE("At a large slip angle the full sliding speed counts for the relaxation") {
@@ -138,10 +138,11 @@ TEST_CASE("At a large slip angle the full sliding speed counts for the relaxatio
     const std::vector<StepResult> ticks = roll(params, body, 240);
     const double steady = ticks.back().state.slip_angle[rear_left]; // rad
     CAPTURE(steady);
-    REQUIRE(steady < -0.3);
+    REQUIRE(steady < -0.3); // measured: -0.48 rad, band: < -0.3 rad
 
     // Over the sliding distance 1 − e^(−s/σ); over the longitudinal distance it would be
     // only 1 − e^(−0.87) = 0.58 after one relaxation length.
+    // measured: -0.0005 %, band: ±3 %
     CHECK(ticks[14].state.slip_angle[rear_left] / steady ==
           doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.03));
 }
@@ -153,7 +154,7 @@ TEST_CASE("Without ground contact the tire forgets its slip angle") {
     body.velocity = {10.0, -1.0, 0.0};
 
     State state = roll(params, body, 60).back().state;
-    REQUIRE(state.slip_angle[front_left] < -0.05);
+    REQUIRE(state.slip_angle[front_left] < -0.05); // measured: -0.099 rad, band: < -0.05 rad
     const WheelContacts in_the_air{};
     state = vehicle_step(state, params, {}, in_the_air, body, 1.0 / 120.0).state;
 
@@ -183,7 +184,7 @@ TEST_CASE("Slip angle weakens the longitudinal force of a locked wheel (combined
     REQUIRE(straight < 0.0);
     // Weighting 1/√(1 + (B·α)²) with B = 8 and α ≈ 5° (the slip denominator turns
     // that into 4.97°): 0.82.
-    CHECK(angled / straight == doctest::Approx(0.82).epsilon(0.01));
+    CHECK(angled / straight == doctest::Approx(0.82).epsilon(0.01)); // measured: +0.53 %, band: ±1 %
 }
 
 TEST_CASE("The anti-roll bar only shifts load between wheels that are on the ground") {
@@ -204,7 +205,7 @@ TEST_CASE("The anti-roll bar only shifts load between wheels that are on the gro
     // Both wheels down: the right one carries more, the sum of the axle stays.
     const auto with_load = wheel_loads(with, contacts);       // N
     const auto without_load = wheel_loads(without, contacts); // N
-    CHECK(with_load[front_right] > without_load[front_right] + 100.0);
+    CHECK(with_load[front_right] > without_load[front_right] + 100.0); // measured: +400 N, band: > +100 N
     CHECK(with_load[front_left] + with_load[front_right] ==
           doctest::Approx(without_load[front_left] + without_load[front_right]));
 

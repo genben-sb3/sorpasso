@@ -54,6 +54,14 @@ _Avoid_: Parameter, Tuning-Werte
 Lamellen-Differenzial einer angetriebenen Achse mit Vorspannung und lastabhängiger Sperrwirkung. Ohne Sperre heißt es **open differential** (offenes Differenzial).
 _Avoid_: Torsen, Sperre
 
+**Reverse gear** (Rückwärtsgang):
+Gang −1: Der Motor dreht die Räder rückwärts. Er legt sich nur ein, solange das Auto (fast) steht; aus der Vorwärtsfahrt bleibt es im Leerlauf. Die Automatic kennt nur Rückwärts, Leerlauf und Fahren.
+_Avoid_: R-Gang, Gang 0
+
+**reverse_ratio** (Rückwärtsübersetzung):
+Das Feld der Vehicle file mit der Übersetzung des Reverse gear, positiv angegeben wie die Vorwärtsgänge; die Achsübersetzung kommt noch dazu. Pflichtfeld.
+_Avoid_: Rückwärtsgang-Faktor
+
 **Automatic** (Automatik):
 Getriebemodus, in dem das Auto selbst kuppelt und schaltet. Im Drift hält es den Gang.
 _Avoid_: Automatikgetriebe

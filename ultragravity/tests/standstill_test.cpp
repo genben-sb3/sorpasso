@@ -34,10 +34,10 @@ TEST_CASE("A car set down compresses its suspension and comes to rest") {
 
     stand(world, tick, 4.0);
 
-    CHECK(world.body().position.z < height_when_set_down - 0.10);
+    CHECK(world.body().position.z < height_when_set_down - 0.10); // measured: 0.16 m lower, band: > 0.10 m
     for (double travel : world.last_step().animation.suspension_travel) {
-        CHECK(travel > 0.03);
-        CHECK(travel < 0.10);
+        CHECK(travel > 0.03); // measured: 0.063 to 0.064 m, band: > 0.03 m
+        CHECK(travel < 0.10); // measured: 0.063 to 0.064 m, band: < 0.10 m
     }
 
     // Afterwards it practically does not move for several seconds.
@@ -55,9 +55,9 @@ TEST_CASE("A car set down compresses its suspension and comes to rest") {
                 std::max(largest_angular_velocity, length(b.angular_velocity));
         }
     }
-    CHECK(largest_deviation < 1e-4);
-    CHECK(largest_velocity < 1e-4);
-    CHECK(largest_angular_velocity < 1e-4);
+    CHECK(largest_deviation < 1e-4); // measured: 9.1e-5 m, band: < 1e-4 m
+    CHECK(largest_velocity < 1e-4); // measured: 2.4e-5 m/s, band: < 1e-4 m/s
+    CHECK(largest_angular_velocity < 1e-4); // measured: 6.8e-10 rad/s, band: < 1e-4 rad/s
 }
 
 TEST_CASE("At standstill the axle loads match the static distribution") {
@@ -74,11 +74,15 @@ TEST_CASE("At standstill the axle loads match the static distribution") {
     const double b = car.center_of_mass.x - car.rear.x;
 
     const auto& wheel_load = world.last_step().telemetry.wheel_load;
+    // measured: -0.013 %, band: ±1 %
     CHECK(wheel_load[front_left] + wheel_load[front_right] ==
           doctest::Approx(weight * b / wheelbase).epsilon(0.01));
+    // measured: +0.014 %, band: ±1 %
     CHECK(wheel_load[rear_left] + wheel_load[rear_right] ==
           doctest::Approx(weight * a / wheelbase).epsilon(0.01));
+    // measured: equal to 6 digits, band: ±1 %
     CHECK(wheel_load[front_left] == doctest::Approx(wheel_load[front_right]).epsilon(0.01));
+    // measured: equal to 6 digits, band: ±1 %
     CHECK(wheel_load[rear_left] == doctest::Approx(wheel_load[rear_right]).epsilon(0.01));
 }
 

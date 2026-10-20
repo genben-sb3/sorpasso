@@ -86,7 +86,7 @@ TEST_CASE("At low speed the car drives the radius the steer angle dictates") {
     const double rear = wheelbase / std::tan(steer_angle);            // m, radius of the rear axle
     const double b = car.center_of_mass.x - car.rear.x;               // m, center of mass ahead of the rear axle
     CAPTURE(c.radius);
-    CHECK(c.radius == doctest::Approx(std::hypot(rear, b)).epsilon(0.05));
+    CHECK(c.radius == doctest::Approx(std::hypot(rear, b)).epsilon(0.05)); // measured: +2.7 %, band: ±5 %
 }
 
 TEST_CASE("At constant speed and fixed steering a steady-state circle develops") {
@@ -104,13 +104,14 @@ TEST_CASE("At constant speed and fixed steering a steady-state circle develops")
     CAPTURE(second.lateral_acceleration);
 
     // Steady state: radius and speed barely change from second to second.
-    CHECK(second.radius == doctest::Approx(first.radius).epsilon(0.01));
-    CHECK(second.speed == doctest::Approx(first.speed).epsilon(0.01));
-    CHECK(second.lateral_acceleration > 3.0);
+    CHECK(second.radius == doctest::Approx(first.radius).epsilon(0.01)); // measured: equal to 6 digits, band: ±1 %
+    CHECK(second.speed == doctest::Approx(first.speed).epsilon(0.01)); // measured: equal to 6 digits, band: ±1 %
+    CHECK(second.lateral_acceleration > 3.0); // measured: 3.83 m/s², band: > 3.0 m/s²
     // The tire forces keep the car exactly on the driven circle. On a
     // steady-state circle that follows from kinematics; the comparison checks that
     // path and forces fit together, the statement about the tire model lies in
     // the steady state and in the radius at low speed.
+    // measured: below 0.001 %, band: ±2 %
     CHECK(second.lateral_acceleration ==
           doctest::Approx(second.speed * second.speed / second.radius).epsilon(0.02));
 }
@@ -142,8 +143,8 @@ TEST_CASE("The highest lateral acceleration lies at the grip of the tires") {
     const double grip = car.front.tire.peak_friction * TestWorld::gravity; // m/s²
     CAPTURE(highest);
     CAPTURE(grip);
-    CHECK(highest > 0.85 * grip);
-    CHECK(highest < friction_circle_limit * grip);
+    CHECK(highest > 0.85 * grip); // measured: 0.91·grip, band: > 0.85·grip
+    CHECK(highest < friction_circle_limit * grip); // measured: 0.91·grip, band: < 1.05·grip
 }
 
 namespace {
@@ -175,7 +176,7 @@ TEST_CASE("In a corner the body rolls outward and the outer wheels carry more lo
     const Roll r = left_corner(car);
     CAPTURE(r.lateral_acceleration);
     CAPTURE(r.roll_angle);
-    REQUIRE(r.lateral_acceleration > 5.0);
+    REQUIRE(r.lateral_acceleration > 5.0); // measured: 5.26 m/s², band: > 5.0 m/s²
 
     CHECK(r.roll_angle > 0.0);
     CHECK(r.transfer_front > 0.0);
@@ -187,7 +188,7 @@ TEST_CASE("In a corner the body rolls outward and the outer wheels carry more lo
                             (r.lateral_acceleration + TestWorld::gravity * std::sin(r.roll_angle));
     const double measured =
         r.transfer_front * car.front.track_width / 2.0 + r.transfer_rear * car.rear.track_width / 2.0;
-    CHECK(measured == doctest::Approx(expected).epsilon(0.02));
+    CHECK(measured == doctest::Approx(expected).epsilon(0.02)); // measured: -0.02 %, band: ±2 %
 }
 
 TEST_CASE("Anti-roll bars reduce the roll and shift the load transfer to their axle") {
@@ -206,11 +207,11 @@ TEST_CASE("Anti-roll bars reduce the roll and shift the load transfer to their a
 
     REQUIRE(car.front.suspension.anti_roll_bar > 0.0);
     REQUIRE(car.rear.suspension.anti_roll_bar > 0.0);
-    CHECK(with_bars.roll_angle < 0.8 * without_bars.roll_angle);
+    CHECK(with_bars.roll_angle < 0.8 * without_bars.roll_angle); // measured: 0.57·without, band: < 0.8·without
     const auto front_share = [](const Roll& r) {
         return r.transfer_front / (r.transfer_front + r.transfer_rear);
     };
-    CHECK(front_share(stiff) > front_share(with_bars) + 0.05);
+    CHECK(front_share(stiff) > front_share(with_bars) + 0.05); // measured: +0.15, band: > +0.05
 }
 
 TEST_CASE("Braking in a corner costs cornering force, the tires stay within the friction circle") {
@@ -220,7 +221,7 @@ TEST_CASE("Braking in a corner costs cornering force, the tires stay within the 
     Drive drive(world);
     for (int i = 0; i < Drive::ticks(6.0); ++i) drive.one_tick(circle(world, steering, 15.0, 2));
     const double before = lateral_acceleration(world, car.mass); // m/s²
-    REQUIRE(before > 5.0);
+    REQUIRE(before > 5.0); // measured: 5.26 m/s², band: > 5.0 m/s²
 
     // Full braking with the same steering. The wheels lock and push almost
     // only longitudinally.
@@ -242,9 +243,9 @@ TEST_CASE("Braking in a corner costs cornering force, the tires stay within the 
     CAPTURE(sum_lateral / ticks);
     CAPTURE(highest_total);
     // With weaker coupling (B = 4 instead of 10) 34 % would remain.
-    CHECK(sum_lateral / ticks < 0.25 * before);
+    CHECK(sum_lateral / ticks < 0.25 * before); // measured: 0.12·before, band: < 0.25·before
     // Without combined slip it would be about 1.13 μ·g.
-    CHECK(highest_total < friction_circle_limit * grip);
+    CHECK(highest_total < friction_circle_limit * grip); // measured: 0.97·grip, band: < 1.05·grip
 }
 
 TEST_CASE("Slow maneuvering at full lock stays calm until the car stands") {
@@ -267,10 +268,10 @@ TEST_CASE("Slow maneuvering at full lock stays calm until the car stands") {
     }
 
     CAPTURE(length(world.body().velocity));
-    CHECK(yaw_rate.longest_run() < 3);
-    CHECK(lateral.longest_run() < 3);
-    CHECK(length(world.body().velocity) < 1e-3);
-    CHECK(std::abs(world.body().angular_velocity.z) < 1e-3);
+    CHECK(yaw_rate.longest_run() < 3); // measured: 1, band: < 3
+    CHECK(lateral.longest_run() < 3); // measured: 1, band: < 3
+    CHECK(length(world.body().velocity) < 1e-3); // measured: 5.2e-12 m/s, band: < 1e-3 m/s
+    CHECK(std::abs(world.body().angular_velocity.z) < 1e-3); // measured: 1.2e-12 rad/s, band: < 1e-3 rad/s
 }
 
 TEST_CASE("At high speed the car does not oscillate after a steering impulse") {
@@ -297,9 +298,9 @@ TEST_CASE("At high speed the car does not oscillate after a steering impulse") {
 
     CAPTURE(largest);
     CAPTURE(other_side);
-    REQUIRE(largest > 0.05);
-    CHECK(other_side < 0.1 * largest);
-    CHECK(std::abs(yaw_rate) < 0.02 * largest);
+    REQUIRE(largest > 0.05); // measured: 0.23 rad/s, band: > 0.05 rad/s
+    CHECK(other_side < 0.1 * largest); // measured: 0.0057·largest, band: < 0.1·largest
+    CHECK(std::abs(yaw_rate) < 0.02 * largest); // measured: 2.9e-8·largest, band: < 0.02·largest
 }
 
 TEST_CASE("Two corner drives with the same input packets yield the same checksum") {

@@ -31,11 +31,11 @@ constexpr double air_density = 1.2; // kg/m³
 
 // Air: the drag acts against the direction of travel at the center of mass, the
 // downforce per axle perpendicular to the body, downward at the axle position.
-void air_forces(const VehicleParams& params, const BodyMotion& body, const Vec3& forward, Forces& forces) {
+void air_forces(const VehicleParams& params, const BodyMotion& body, double v_longitudinal, Forces& forces) {
     const double dynamic_pressure_factor = 0.5 * air_density; // kg/m³
     forces.force +=
         body.velocity * (-dynamic_pressure_factor * params.aero.drag_area * length(body.velocity));
-    const double airspeed = std::max(dot(body.velocity, forward), 0.0); // m/s
+    const double airspeed = std::max(v_longitudinal, 0.0); // m/s
     for (const Axle* axle : {&params.front, &params.rear}) {
         const Vec3 downforce = rotate(body.orientation, {0.0, 0.0, -1.0}) *
                                (dynamic_pressure_factor * axle->downforce * airspeed * airspeed); // N
@@ -267,15 +267,21 @@ double equalizing_impulse(double difference, // rad/s
     return std::clamp(difference * inertia, -limit, limit);
 }
 
+// Gear numbers: -1 reverse, 0 neutral, 1 … n forward gears.
+bool is_reverse(int gear) { return gear < 0; }
+bool is_forward(int gear) { return gear > 0; }
+
 // Overall ratio from the engine to the wheels; negative in reverse, so the
 // engine turns the wheels backward.
 double overall_ratio(const Drivetrain& d, int gear) {
-    if (gear > 0) return d.gearbox.ratios[gear - 1] * d.gearbox.final_drive;
-    if (gear < 0) return -d.gearbox.reverse_ratio * d.gearbox.final_drive;
+    if (is_forward(gear)) return d.gearbox.ratios[gear - 1] * d.gearbox.final_drive;
+    if (is_reverse(gear)) return -d.gearbox.reverse_ratio * d.gearbox.final_drive;
     return 0.0;
 }
 
 // Reverse only engages below this forward speed, never out of forward travel.
+// This is a rule of the gearbox that holds for every car, not a tuning value
+// of one vehicle, so it is not in the vehicle file.
 constexpr double reverse_engage_speed = 0.5; // m/s
 
 // The gear the automatic picks next. It works with the engine speed that
@@ -287,7 +293,7 @@ int automatic_gear(const State& state, const VehicleParams& k, double brake, Vec
     const Automatic& au = d.gearbox.automatic;
     const int gears = static_cast<int>(d.gearbox.ratios.size());
     // From neutral or reverse the automatic pulls away in first gear.
-    if (state.gear <= 0) return 1;
+    if (!is_forward(state.gear)) return 1;
     const int gear = state.gear;
     if (state.gear_age < au.hold_time) return gear;
 
@@ -368,6 +374,8 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     const auto rays = probe_rays(params, body);
     const auto mounts = wheel_mounts(params);
     const Vec3 forward = rotate(body.orientation, {1.0, 0.0, 0.0});
+    const Vec3 lateral_axis = rotate(body.orientation, {0.0, 1.0, 0.0});
+    const double v_longitudinal = dot(body.velocity, forward); // m/s
     const double front_steer_angle = std::clamp(input.steering, -1.0, 1.0) * params.steering.max_steer_angle; // rad
 
     // Springs and dampers first for all wheels, because the anti-roll bar needs both
@@ -422,7 +430,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         result.telemetry.wheel_load[i] = wheel_load;
     }
 
-    air_forces(params, body, forward, result.forces);
+    air_forces(params, body, v_longitudinal, result.forces);
 
     // Wheels and tires in substeps. Wheel load, contact point and rotation of the
     // body stay fixed meanwhile. Deliberate approximation: only the velocity of the
@@ -434,18 +442,18 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     const bool automatic = drivetrain.gearbox.mode == GearboxMode::automatic;
     const int gears = static_cast<int>(drivetrain.gearbox.ratios.size());
     result.state.gear_age += dt;
-    const double v_longitudinal = dot(body.velocity, forward); // m/s
     int gear_request = std::clamp(static_cast<int>(input.gear_request), -1, gears);
-    if (automatic && gear_request > 0) {
+    if (automatic && is_forward(gear_request)) {
         // The automatic only knows reverse (-1), neutral (0) and drive (anything above);
         // it picks the forward gear itself and never shifts in reverse.
-        const Vec3 vehicle_velocity{v_longitudinal, dot(body.velocity, rotate(body.orientation, {0.0, 1.0, 0.0})),
-                                    0.0};
+        const Vec3 vehicle_velocity{v_longitudinal, dot(body.velocity, lateral_axis), 0.0};
         gear_request = automatic_gear(state, params, input.brake, vehicle_velocity, drive_radius(driven));
     }
     // Out of forward travel the reverse gear does not engage; the car stays in neutral
     // until it has (nearly) stopped.
-    if (gear_request < 0 && state.gear >= 0 && v_longitudinal > reverse_engage_speed) gear_request = 0;
+    if (is_reverse(gear_request) && !is_reverse(state.gear) && v_longitudinal > reverse_engage_speed) {
+        gear_request = 0;
+    }
     // Gear change: the requested gear only engages after the shift time, until then
     // there is no drive.
     if (gear_request != result.state.gear) {
@@ -562,11 +570,11 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     // From the orientation of the body: pitch from the incline of the longitudinal axis,
     // roll from the incline of the lateral axis.
     anim.pitch = std::asin(std::clamp(-forward.z, -1.0, 1.0));
-    anim.roll = std::asin(std::clamp(rotate(body.orientation, {0.0, 1.0, 0.0}).z, -1.0, 1.0));
+    anim.roll = std::asin(std::clamp(lateral_axis.z, -1.0, 1.0));
     anim.steering_wheel = std::clamp(input.steering, -1.0, 1.0) * steering_wheel_lock;
     anim.engine_speed = result.state.engine_speed;
     result.telemetry.slip_angle = result.state.slip_angle;
-    result.telemetry.speed = dot(body.velocity, forward);
+    result.telemetry.speed = v_longitudinal;
     return result;
 }
 

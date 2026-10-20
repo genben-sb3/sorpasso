@@ -238,7 +238,7 @@ Drivetrain read_drivetrain(Reader& reader, const json& root) {
 
 std::string number_as_text(double value) {
     std::ostringstream s;
-    s.imbue(std::locale::classic()); // decimal point, whatever the host has set
+    s.imbue(std::locale::classic()); // decimal point, whatever locale the program has set
     s << value;
     return s.str();
 }

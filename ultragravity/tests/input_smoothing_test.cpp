@@ -37,6 +37,7 @@ TEST_CASE("A full key press builds up the steering over the set time") {
     raw.steering = 1.0;
     const BodyMotion slow = straight_ahead(2.0); // the limit is 1 there
 
+    // measured: 0.5 to 6 digits, band: ±2 %
     CHECK(run(car, slow, raw, p.steer_rise_time / 2.0).packet.steering == doctest::Approx(0.5).epsilon(0.02));
     CHECK(run(car, slow, raw, p.steer_rise_time * 1.05).packet.steering == doctest::Approx(1.0));
 }
@@ -48,7 +49,7 @@ TEST_CASE("Releasing returns the steering faster than it was built up") {
     RawInput released;
 
     const SmoothingResult e = run(car, slow, released, p.steer_fall_time / 2.0, {1.0, 0.0, 0.0});
-    CHECK(e.packet.steering == doctest::Approx(0.5).epsilon(0.02));
+    CHECK(e.packet.steering == doctest::Approx(0.5).epsilon(0.02)); // measured: 0.5 to 6 digits, band: ±2 %
     CHECK(p.steer_fall_time < p.steer_rise_time);
     CHECK(run(car, slow, released, p.steer_fall_time * 1.05, {1.0, 0.0, 0.0}).packet.steering == doctest::Approx(0.0));
 }
@@ -62,12 +63,12 @@ TEST_CASE("Throttle and brake rise smoothly with digital input") {
 
     const SmoothingResult first = smooth({}, p, car, straight_ahead(10.0), raw, 0, dt);
     CHECK(first.packet.throttle > 0.0);
-    CHECK(first.packet.throttle < 0.1);
+    CHECK(first.packet.throttle < 0.1); // measured: 0.033, band: < 0.1
     CHECK(first.packet.brake > 0.0);
-    CHECK(first.packet.brake < 0.1);
+    CHECK(first.packet.brake < 0.1); // measured: 0.042, band: < 0.1
 
     const SmoothingResult half = run(car, straight_ahead(10.0), raw, p.throttle_rise_time / 2.0);
-    CHECK(half.packet.throttle == doctest::Approx(0.5).epsilon(0.02));
+    CHECK(half.packet.throttle == doctest::Approx(0.5).epsilon(0.02)); // measured: 0.5 to 6 digits, band: ±2 %
     CHECK(run(car, straight_ahead(10.0), raw, 1.0).packet.throttle == doctest::Approx(1.0));
 
     RawInput released;
@@ -82,8 +83,8 @@ TEST_CASE("The steering limit drops with speed down to the peak slip angle") {
     CHECK(steering_limit(car, 40.0, 1.0) < steering_limit(car, 15.0, 1.0));
     // Lateral curve of the coupe: B = 14, C = 1.5, E = 0.3, peak at about 0.12 rad.
     const double angle = steering_limit(car, 100.0, 1.0) * car.steering.max_steer_angle; // rad
-    CHECK(angle > 0.10);
-    CHECK(angle < 0.17);
+    CHECK(angle > 0.10); // measured: 0.146 rad, band: > 0.10 rad
+    CHECK(angle < 0.17); // measured: 0.146 rad, band: < 0.17 rad
 }
 
 TEST_CASE("At high speed a full key press does not steer beyond the grip") {
@@ -109,16 +110,16 @@ TEST_CASE("At high speed a full key press does not steer beyond the grip") {
         const Vec3 force = rotate_inverse(world.body().orientation, world.last_step().forces.force);
         highest_lateral = std::max(highest_lateral, std::abs(force.y) / car.mass);
         highest_drift = std::max(highest_drift, std::abs(std::atan2(v.y, v.x)));
-        CHECK(std::abs(e.packet.steering) <= limit + 1e-3);
+        CHECK(std::abs(e.packet.steering) <= limit + 1e-3); // measured: at most limit + 4e-6, band: limit + 1e-3
     }
     CAPTURE(highest_lateral);
     CAPTURE(highest_drift);
-    CHECK(steering_limit(car, speed, SmoothingParams{}.peak_fraction) < 0.3);
+    CHECK(steering_limit(car, speed, SmoothingParams{}.peak_fraction) < 0.3); // measured: 0.21, band: < 0.3
     // Friction circle: a little above μ·g is possible thanks to downforce and load sensitivity.
     // The turn-in jolt overshoots briefly (inertia, relaxation), hence 1.3 instead of 1.05.
-    CHECK(highest_lateral < 1.3 * 1.05 * TestWorld::gravity);
+    CHECK(highest_lateral < 1.3 * 1.05 * TestWorld::gravity); // measured: 1.24·1.05·g, band: < 1.3·1.05·g
     // A spin goes toward 90° and more; here the car catches itself.
-    CHECK(highest_drift < 0.5);
+    CHECK(highest_drift < 0.5); // measured: 0.35 rad, band: < 0.5 rad
 }
 
 TEST_CASE("If the rear slides and the steering key is released, the countersteer aid steers in the direction of travel") {
@@ -128,11 +129,11 @@ TEST_CASE("If the rear slides and the steering key is released, the countersteer
     // Moves left of the longitudinal axis (vy > 0): the rear has stepped out to the right.
     BodyMotion left = straight_ahead(20.0);
     left.velocity = {20.0, 5.0, 0.0};
-    CHECK(run(car, left, released, 0.3).packet.steering > 0.1);
+    CHECK(run(car, left, released, 0.3).packet.steering > 0.1); // measured: 0.78, band: > 0.1
 
     BodyMotion right = straight_ahead(20.0);
     right.velocity = {20.0, -5.0, 0.0};
-    CHECK(run(car, right, released, 0.3).packet.steering < -0.1);
+    CHECK(run(car, right, released, 0.3).packet.steering < -0.1); // measured: -0.78, band: < -0.1
 
     // If the driver holds the key, their wish applies, not the aid.
     RawInput right_key;

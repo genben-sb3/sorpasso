@@ -11,7 +11,7 @@ cmake --workflow --preset standard   # konfigurieren, bauen, alle Tests
 Danach reichen `cmake --build build` und `ctest --test-dir build`.
 Einzelne Tests: `ctest --test-dir build -R <Teil des TEST_CASE-Namens>`.
 
-Vor jedem Commit mit Physik-Dateien läuft `cmake --workflow --preset pruefen` (Sanitizer, libstdc++-Assertions, `-Werror`, Build in `build-pruefen/`). Den Hook einmal pro Klon aktivieren (aus dem Repo-Root; `core.hooksPath` bleibt unverändert, damit die Git-LFS-Hooks weiterlaufen):
+Vor jedem Commit mit Physik-Dateien läuft `cmake --workflow --preset check` (Sanitizer, libstdc++-Assertions, `-Werror`, Build in `build-check/`). Den Hook einmal pro Klon aktivieren (aus dem Repo-Root; `core.hooksPath` bleibt unverändert, damit die Git-LFS-Hooks weiterlaufen):
 
 ```sh
 ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-commit"

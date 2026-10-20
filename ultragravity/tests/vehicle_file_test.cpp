@@ -47,7 +47,7 @@ TEST_CASE("The sports coupe has 300 hp and six gears") {
     REQUIRE_FALSE(result.error.has_value());
     const Drivetrain& drivetrain = result.params.drivetrain;
     CHECK(drivetrain.gearbox.ratios.size() == 6);
-    // The vehicle file states engine speeds in rpm, the parameters in rad/s.
+    // The vehicle file states engine speeds in rpm, the vehicle params in rad/s.
     constexpr double rpm = 2.0 * std::numbers::pi / 60.0;
     CHECK(drivetrain.engine.idle_speed == doctest::Approx(900.0 * rpm));
     double peak_power = 0.0;
@@ -55,7 +55,7 @@ TEST_CASE("The sports coupe has 300 hp and six gears") {
         peak_power = std::max(peak_power, p.speed * p.torque);
     }
     constexpr double hp = 735.49875; // W
-    CHECK(peak_power / hp == doctest::Approx(300.0).epsilon(0.01));
+    CHECK(peak_power / hp == doctest::Approx(300.0).epsilon(0.01)); // measured: 299.85 hp (-0.05 %), band: ±1 %
 }
 
 TEST_CASE("Broken JSON reports line and column") {
@@ -140,7 +140,7 @@ TEST_CASE("Tires without grip are rejected") {
     CHECK(result.error->message == "must be greater than 0");
 }
 
-TEST_CASE("Parameters without physical sense are rejected with the field path") {
+TEST_CASE("Vehicle params without physical sense are rejected with the field path") {
     struct Case {
         nlohmann::json::json_pointer field;
         double value;
@@ -491,7 +491,7 @@ std::string file_text(const std::string& path) {
 }
 
 // Checksum of the car after it was set down and drove off steering, so the
-// parameters of springs, tires, steering and drivetrain all leave a trace.
+// vehicle params of springs, tires, steering and drivetrain all leave a trace.
 std::uint64_t checksum_after_drive(const VehicleParams& car) {
     TestWorld world(car, 0.05);
     test::Drive drive(world);
@@ -508,7 +508,7 @@ std::string write_temporary_file(const nlohmann::json& j, const char* name) {
 
 } // namespace
 
-TEST_CASE("Loading from text yields the same parameters as loading the same file from a path") {
+TEST_CASE("Loading from text yields the same vehicle params as loading the same file from a path") {
     const LoadResult from_path = load_vehicle_file(sports_coupe_path);
     const LoadResult from_text = parse_vehicle_file(file_text(sports_coupe_path));
 
@@ -517,7 +517,7 @@ TEST_CASE("Loading from text yields the same parameters as loading the same file
     CHECK(from_text.params.name == from_path.params.name);
     CHECK(checksum_after_drive(from_text.params) == checksum_after_drive(from_path.params));
 
-    // The checksum notices a single changed parameter, so the comparison above has teeth.
+    // The checksum notices a single changed vehicle param, so the comparison above has teeth.
     VehicleParams heavier = from_path.params;
     heavier.mass += 1.0;
     CHECK(checksum_after_drive(heavier) != checksum_after_drive(from_path.params));
@@ -541,7 +541,7 @@ TEST_CASE("An error in the text is reported with the same field path as from a p
 }
 
 TEST_CASE("A vehicle file text cut off in the middle yields a syntax error instead of crashing") {
-    // As if the host read the file only halfway.
+    // As if the adapter read the file only halfway.
     const std::string text = file_text(sports_coupe_path);
     const std::string cut = text.substr(0, text.size() / 2);
 

@@ -86,7 +86,7 @@ TEST_CASE("Level 0 behaves exactly like no traction control") {
     CHECK(checksum(off.last_step().state, off.body()) ==
           checksum(level0.last_step().state, level0.body()));
     // And without the aid it spins noticeably, otherwise the comparison would prove nothing.
-    CHECK(full_throttle(0).peak_slip > 1.0); // measured: about 7
+    CHECK(full_throttle(0).peak_slip > 1.0); // measured: 7.38, band: > 1.0
 }
 
 TEST_CASE("Traction control does not oscillate") {
@@ -96,8 +96,8 @@ TEST_CASE("Traction control does not oscillate") {
         CAPTURE(f.direction_changes);
         // Measured: at most 5 changes in 4 s (cut, hold, restore); switching
         // on and off every tick would be over 100.
-        CHECK(f.direction_changes <= 6);
+        CHECK(f.direction_changes <= 6); // measured: at most 5, band: <= 6
         // It does not brake into nothing: the car makes progress with it.
-        CHECK(f.speed > 6.0);
+        CHECK(f.speed > 6.0); // measured: at least 7.07 m/s, band: > 6.0 m/s
     }
 }

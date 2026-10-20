@@ -29,12 +29,12 @@ Der Sim-Kern (`Source/GTOSim`) rechnet in SI-Einheiten mit Unreal-Achsen (X vorn
 Die Fahrphysik liegt im Unreal-Modul `Source/UltraGravity` (C++20, nur Standardbibliothek, SI-Einheiten mit ISO-8855-Achsen: X vorn, Y links, Z oben). Das CMake-Projekt `ultragravity/` baut dieselben Quellen ohne Unreal, dazu Testwelt und doctest-Tests; dafür braucht es keine Unreal-Installation. Bauen und alle Tests (im Repo-Root):
 
 ```
-cd ultragravity && cmake --workflow --preset pruefen
+cd ultragravity && cmake --workflow --preset check
 ```
 
-`pruefen` baut mit Sanitizern und `-Werror` in `ultragravity/build-pruefen/`; schneller ohne Sanitizer ist `--preset standard` (Build in `ultragravity/build/`, einzelne Tests mit `ctest --test-dir build -R <Name>`). Neue `.cpp` im Modul in `ultragravity/physics/CMakeLists.txt` eintragen (UBT findet sie von selbst, CMake nicht), neue Testdateien in `ultragravity/tests/CMakeLists.txt`.
+`check` baut mit Sanitizern und `-Werror` in `ultragravity/build-check/`; schneller ohne Sanitizer ist `--preset standard` (Build in `ultragravity/build/`, einzelne Tests mit `ctest --test-dir build -R <Name>`). Neue `.cpp` im Modul in `ultragravity/physics/CMakeLists.txt` eintragen (UBT findet sie von selbst, CMake nicht), neue Testdateien in `ultragravity/tests/CMakeLists.txt`.
 
-Der Pre-Commit-Hook `.githooks/pre-commit` prüft Einheitenkommentare und läuft `pruefen`, aber nur, wenn der Commit Dateien unter `Source/UltraGravity` oder `ultragravity` enthält. Einmal pro Klon aktivieren (im Repo-Root):
+Der Pre-Commit-Hook `.githooks/pre-commit` prüft Einheitenkommentare und läuft `check`, aber nur, wenn der Commit Dateien unter `Source/UltraGravity` oder `ultragravity` enthält. Einmal pro Klon aktivieren (im Repo-Root):
 
 ```
 ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-commit"

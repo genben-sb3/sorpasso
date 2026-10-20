@@ -158,7 +158,7 @@ struct LoadResult {
     std::optional<LoadError> error;
 };
 
-// Loads a vehicle file from its JSON text, for a host that reads the file
+// Loads a vehicle file from its JSON text, for an adapter that reads the file
 // itself (the Unreal adapter uses Unreal's file access). Same checks, field
 // paths and messages as load_vehicle_file. Invalid JSON yields an error with
 // line and column. Throws no exceptions.
