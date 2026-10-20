@@ -7,7 +7,7 @@ namespace ultragravity {
 inline constexpr int wheel_count = 4; // API
 
 // The visible state of a car per tick. Rendering only reads it.
-// Angles follow ISO 8855 (ADR-0004): pitch positive nose down,
+// Angles follow ISO 8855 (ADR 0006): pitch positive nose down,
 // roll positive with the left side up, steering positive to the left.
 struct AnimationData {
     std::array<double, wheel_count> wheel_angle{};       // rad, positive when rolling forward, in [-π, π)

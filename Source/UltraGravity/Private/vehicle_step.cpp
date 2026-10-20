@@ -68,7 +68,7 @@ double anti_roll_bar_load(const Suspension& s, double compression, double compre
     return std::clamp(s.anti_roll_bar * (compression - compression_opposite), -load, load_opposite);
 }
 
-// Substeps for wheels and tires per vehicle step (ADR-0006).
+// Substeps for wheels and tires per vehicle step (ADR 0008).
 constexpr int substeps = 8;
 
 // Rotation of the steering wheel at full lock, per side (450°).

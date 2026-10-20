@@ -158,10 +158,14 @@ struct LoadResult {
     std::optional<LoadError> error;
 };
 
-// Reads a vehicle file from JSON text. Throws no exceptions.
+// Loads a vehicle file from its JSON text, for a host that reads the file
+// itself (the Unreal adapter uses Unreal's file access). Same checks, field
+// paths and messages as load_vehicle_file. Invalid JSON yields an error with
+// line and column. Throws no exceptions.
 LoadResult parse_vehicle_file(std::string_view json);
 
-// Loads a vehicle file from disk. Throws no exceptions.
+// Loads a vehicle file from disk; reads the file and hands the text to
+// parse_vehicle_file. Throws no exceptions.
 LoadResult load_vehicle_file(const std::string& path);
 
 } // namespace ultragravity
