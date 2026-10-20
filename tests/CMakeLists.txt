@@ -6,6 +6,7 @@ add_executable(ultragravity_tests
   geradeaus_test.cpp
   antrieb_test.cpp
   kurven_test.cpp
+  traktion_test.cpp
   animation_test.cpp
   aero_test.cpp
 )

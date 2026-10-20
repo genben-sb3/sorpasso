@@ -290,6 +290,32 @@ int automatikgang(const Zustand& zustand, const Kennwerte& k, double bremse, Vec
     return gang;
 }
 
+// Traktionskontrolle: Sie nimmt dem Fahrer Gas weg, solange der Schlupf der
+// Antriebsräder über dem Ziel der Stufe liegt, und gibt es erst wieder, wenn er
+// deutlich darunter liegt. Dazwischen hält sie den Faktor (Hysterese), damit sie
+// nicht an- und ausschaltet. Stufe 0 greift nie ein.
+constexpr double tk_ziel_stufe0 = 0.30;       // 1, Ziel-Schlupf, von dem aus die Stufen abziehen
+constexpr double tk_ziel_je_stufe = 0.05;     // 1, weniger Ziel-Schlupf je Stufe
+constexpr double tk_untere_schwelle = 0.8;    // 1, Anteil des Ziels, unter dem das Gas zurückkommt
+constexpr double tk_abregeln = 2.0;           // 1/s, Gasfaktor, der je Sekunde wegfällt
+constexpr double tk_aufregeln = 0.5;          // 1/s, Gasfaktor, der je Sekunde zurückkommt
+
+double traktionsfaktor(double faktor, int stufe, const Antriebsachsen& angetrieben,
+                       const std::array<double, anzahl_raeder>& raddrehzahl, double v_laengs, double dt) {
+    if (stufe <= 0) return 1.0;
+    const double ziel = std::max(tk_ziel_stufe0 - tk_ziel_je_stufe * std::min(stufe, 5), 0.01); // 1
+    double schlupf = 0.0; // 1, größter Antriebsschlupf
+    for (int i = 0; i < angetrieben.anzahl; ++i) {
+        const Antriebsachse& a = angetrieben.achsen[i];
+        for (int rad : {a.links, a.rechts}) {
+            schlupf = std::max(schlupf, (raddrehzahl[rad] * a.achse->radradius - v_laengs) / schlupfnenner(v_laengs));
+        }
+    }
+    if (schlupf > ziel) return std::max(faktor - tk_abregeln * dt, 0.0);
+    if (schlupf < tk_untere_schwelle * ziel) return std::min(faktor + tk_aufregeln * dt, 1.0);
+    return faktor;
+}
+
 } // namespace
 
 Zustand rollender_zustand(const Kennwerte& kennwerte, double geschwindigkeit) {
@@ -418,6 +444,9 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     }
     const double uebersetzung = gesamtuebersetzung(antrieb, ergebnis.zustand.gang);
     double& motordrehzahl = ergebnis.zustand.motordrehzahl;
+    ergebnis.zustand.traktionsfaktor =
+        traktionsfaktor(zustand.traktionsfaktor, eingabe.fahrhilfen.traktionskontrolle, angetrieben,
+                        zustand.raddrehzahl, skalar(karosserie.geschwindigkeit, vorn), dt);
     // Die Automatik kuppelt selbst: mit der Motordrehzahl über Leerlauf ein und
     // nach dem Schalten innerhalb der Einkuppelzeit wieder.
     const Automatik& au = antrieb.getriebe.automatik;
@@ -435,7 +464,8 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     Vec3 dv_karosserie; // m/s
     for (int schritt = 0; schritt < zwischenschritte; ++schritt) {
         // Beim automatischen Schalten nimmt die Automatik das Gas weg.
-        const double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
+        double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
+        gas *= ergebnis.zustand.traktionsfaktor;
         motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, gas) / antrieb.motor.traegheit;
         motordrehzahl = std::max(motordrehzahl, 0.0);
         for (int i = 0; i < anzahl_raeder; ++i) ergebnis.zustand.raddrehwinkel[i] += h * ergebnis.zustand.raddrehzahl[i];
