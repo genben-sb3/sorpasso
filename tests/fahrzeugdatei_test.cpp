@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <numbers>
 #include <sstream>
 #include <string>
 
@@ -42,7 +43,7 @@ TEST_CASE("Das Sportcoupé hat 300 PS und sechs Gänge") {
     const Antrieb& antrieb = ergebnis.kennwerte.antrieb;
     CHECK(antrieb.getriebe.uebersetzungen.size() == 6);
     // Die Fahrzeugdatei nennt Drehzahlen in U/min, die Kennwerte in rad/s.
-    constexpr double u_min = 2.0 * 3.14159265358979323846 / 60.0;
+    constexpr double u_min = 2.0 * std::numbers::pi / 60.0;
     CHECK(antrieb.motor.leerlaufdrehzahl == doctest::Approx(900.0 * u_min));
     double spitzenleistung = 0.0;
     for (const Stuetzpunkt& p : antrieb.motor.drehmoment) {
@@ -168,6 +169,21 @@ TEST_CASE("Kennwerte ohne physikalischen Sinn werden mit Feldpfad abgelehnt") {
          "darf höchstens 2 sein"},
         {ptr("/achsen/vorn/reifen/laengs/kruemmung"), 1.2, "achsen.vorn.reifen.laengs.kruemmung",
          "darf höchstens 1 sein"},
+        {ptr("/achsen/vorn/fahrwerk/stabilisator"), -1.0, "achsen.vorn.fahrwerk.stabilisator",
+         "darf nicht negativ sein"},
+        {ptr("/achsen/hinten/reifen/relaxationslaenge"), 0.0, "achsen.hinten.reifen.relaxationslaenge",
+         "muss größer als 0 sein"},
+        {ptr("/achsen/vorn/reifen/quer/steifigkeit"), 0.0, "achsen.vorn.reifen.quer.steifigkeit",
+         "muss größer als 0 sein"},
+        {ptr("/achsen/hinten/reifen/quer/form"), 2.5, "achsen.hinten.reifen.quer.form", "darf höchstens 2 sein"},
+        {ptr("/achsen/vorn/reifen/quer/kruemmung"), 1.2, "achsen.vorn.reifen.quer.kruemmung",
+         "darf höchstens 1 sein"},
+        {ptr("/achsen/vorn/reifen/kombiniert/laengs"), -1.0, "achsen.vorn.reifen.kombiniert.laengs",
+         "darf nicht negativ sein"},
+        {ptr("/achsen/hinten/reifen/kombiniert/quer"), -1.0, "achsen.hinten.reifen.kombiniert.quer",
+         "darf nicht negativ sein"},
+        {ptr("/lenkung/max_lenkwinkel_grad"), 0.0, "lenkung.max_lenkwinkel_grad", "muss größer als 0 sein"},
+        {ptr("/lenkung/max_lenkwinkel_grad"), 75.0, "lenkung.max_lenkwinkel_grad", "darf höchstens 60 sein"},
         {ptr("/bremsen/moment"), -1.0, "bremsen.moment", "darf nicht negativ sein"},
         {ptr("/bremsen/balance"), 1.2, "bremsen.balance", "muss zwischen 0 und 1 liegen"},
         {ptr("/antrieb/motor/drehmoment/0/u_min"), 0.0, "antrieb.motor.drehmoment[0].u_min",

@@ -14,18 +14,26 @@
         "daempfer_druck": 3000.0,
         "daempfer_zug": 4500.0,
         "federweg": 0.15,
-        "anschlagrate": 500000.0
+        "anschlagrate": 500000.0,
+        "stabilisator": 25000.0
       },
       "reifen": {
         "spitzenreibwert": 1.05,
         "nennlast": 3400.0,
         "lastempfindlichkeit": 0.1,
         "traegheit": 1.2,
+        "relaxationslaenge": 0.3,
         "laengs": {
           "steifigkeit": 10.0,
           "form": 1.9,
           "kruemmung": 0.97
-        }
+        },
+        "quer": {
+          "steifigkeit": 14.0,
+          "form": 1.5,
+          "kruemmung": 0.3
+        },
+        "kombiniert": { "laengs": 8.0, "quer": 10.0 }
       }
     },
     "hinten": {
@@ -38,21 +46,30 @@
         "daempfer_druck": 2800.0,
         "daempfer_zug": 4200.0,
         "federweg": 0.15,
-        "anschlagrate": 500000.0
+        "anschlagrate": 500000.0,
+        "stabilisator": 12000.0
       },
       "reifen": {
         "spitzenreibwert": 1.05,
         "nennlast": 3200.0,
         "lastempfindlichkeit": 0.1,
         "traegheit": 1.2,
+        "relaxationslaenge": 0.3,
         "laengs": {
           "steifigkeit": 10.0,
           "form": 1.9,
           "kruemmung": 0.97
-        }
+        },
+        "quer": {
+          "steifigkeit": 14.0,
+          "form": 1.5,
+          "kruemmung": 0.3
+        },
+        "kombiniert": { "laengs": 8.0, "quer": 10.0 }
       }
     }
   },
+  "lenkung": { "max_lenkwinkel_grad": 35.0 },
   "bremsen": {
     "moment": 7000.0,
     "balance": 0.65

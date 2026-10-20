@@ -15,6 +15,7 @@ struct Fahrwerk {
     double daempfer_zug = 0.0;   // N·s/m beim Ausfedern
     double federweg = 0.0;       // m vom voll ausgefederten Rad bis zum Anschlag
     double anschlagrate = 0.0;   // N/m zusätzlich hinter dem Anschlag
+    double stabilisator = 0.0;   // N/m, Kraft je Meter Unterschied der Einfederung links und rechts
 };
 
 // Form der Magic-Formula-Kurve über einem Schlupf.
@@ -24,6 +25,13 @@ struct Kurvenform {
     double kruemmung = 0.0;   // E
 };
 
+// Kombinierter Schlupf: Jede Kraft wird mit G = cos(atan(B·x)) über dem
+// jeweils anderen Schlupf gewichtet, so teilen sich Längs- und Seitenkraft den Grip.
+struct Gewichtung {
+    double laengs = 0.0; // B, schwächt die Längskraft über dem Schräglaufwinkel α in rad
+    double quer = 0.0;   // B, schwächt die Seitenkraft über dem Längsschlupf κ
+};
+
 // Reifen nach der Magic Formula. Der Spitzenreibwert gilt bei Nennlast auf
 // einem Belag mit Reibwert 1 und sinkt mit steigender Radlast.
 struct Reifen {
@@ -31,7 +39,10 @@ struct Reifen {
     double nennlast = 0.0;            // N
     double lastempfindlichkeit = 0.0; // Verlust an Reibwert (relativ) je Nennlast Mehrlast
     double traegheit = 0.0;           // kg·m², Rad und Reifen um die Drehachse
+    double relaxationslaenge = 0.0;   // m Rollstrecke, bis die Seitenkraft 63 % erreicht
     Kurvenform laengs;                // über dem Längsschlupf κ (dimensionslos)
+    Kurvenform quer;                  // über dem Schräglaufwinkel α in rad
+    Gewichtung kombiniert;
 };
 
 // Eine Achse mit zwei gleichen Rädern links und rechts.
@@ -42,6 +53,10 @@ struct Achse {
     double radradius = 0.0;   // m
     Fahrwerk fahrwerk;
     Reifen reifen;
+};
+
+struct Lenkung {
+    double max_lenkwinkel = 0.0; // rad an beiden Vorderrädern bei vollem Ausschlag
 };
 
 struct Bremsen {
@@ -90,6 +105,7 @@ struct Kennwerte {
     Vec3 schwerpunkt;    // m
     Achse vorn;
     Achse hinten;
+    Lenkung lenkung;
     Bremsen bremsen;
     Antrieb antrieb;
 };

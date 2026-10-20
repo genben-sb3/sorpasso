@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <optional>
+#include <numbers>
 
 #include "fahrt.h"
 
@@ -12,7 +12,7 @@ using namespace ultragravity::test;
 
 namespace {
 
-constexpr double u_min = 2.0 * 3.14159265358979323846 / 60.0; // rad/s je U/min
+constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
 
 double drehzahl(const Testwelt& welt) { return welt.letzter_schritt().animationsdaten.drehzahl; }
 
@@ -74,34 +74,6 @@ private:
     int gang_ = 1;
     double zeit_ = 0.0;        // s seit Beginn des Anfahrens
     double geschaltet_ = -1e9; // s, Zeitpunkt des letzten Gangwechsels
-};
-
-// Erkennt Schwingen an einer Drehzahl: Wechselt ihre Änderung von Tick zu Tick
-// dreimal hintereinander das Vorzeichen, zappelt sie, statt einem Verlauf zu folgen.
-class Schwingungsmelder {
-public:
-    void nimm(double drehzahl) {
-        if (bisher_) {
-            const double aenderung = drehzahl - *bisher_;
-            if (std::abs(aenderung) > rauschen) {
-                const int richtung = aenderung > 0.0 ? 1 : -1;
-                wechsel_in_folge_ = richtung == -richtung_ ? wechsel_in_folge_ + 1 : 0;
-                richtung_ = richtung;
-                laengste_folge_ = std::max(laengste_folge_, wechsel_in_folge_);
-            }
-        }
-        bisher_ = drehzahl;
-    }
-
-    int laengste_folge() const { return laengste_folge_; }
-
-private:
-    static constexpr double rauschen = 0.01; // rad/s je Tick
-
-    std::optional<double> bisher_;
-    int richtung_ = 0;
-    int wechsel_in_folge_ = 0;
-    int laengste_folge_ = 0;
 };
 
 } // namespace

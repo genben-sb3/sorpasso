@@ -44,10 +44,10 @@ struct Kraefte {
     Vec3 moment;
 };
 
-// Vollständiger, kopierbarer Zustand des Fahrzeugmodells. Relaxationszustände
-// kommen mit dem Querreifen dazu.
+// Vollständiger, kopierbarer Zustand des Fahrzeugmodells.
 struct Zustand {
     std::array<double, anzahl_raeder> raddrehzahl{}; // rad/s, positiv beim Vorwärtsrollen
+    std::array<double, anzahl_raeder> schraeglauf{}; // rad, dem Reifen über die Relaxationslänge nachgeführt
     double motordrehzahl = 0.0;                      // rad/s
     int gang = 0;                                    // 0 Leerlauf, 1 … n Vorwärtsgänge
     double schaltrest = 0.0;                         // s, bis der Gang greift

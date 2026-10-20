@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <locale>
+#include <numbers>
 #include <sstream>
 
 #include "nlohmann/json.hpp"
@@ -109,7 +110,16 @@ Fahrwerk lies_fahrwerk(Leser& leser, const json& o, const std::string& pfad) {
     f.daempfer_zug = leser.zahl(o, pfad, "daempfer_zug");
     f.federweg = leser.zahl(o, pfad, "federweg");
     f.anschlagrate = leser.zahl(o, pfad, "anschlagrate");
+    f.stabilisator = leser.zahl(o, pfad, "stabilisator");
     return f;
+}
+
+Kurvenform lies_kurvenform(Leser& leser, const json& o, const std::string& pfad) {
+    Kurvenform k;
+    k.steifigkeit = leser.zahl(o, pfad, "steifigkeit");
+    k.form = leser.zahl(o, pfad, "form");
+    k.kruemmung = leser.zahl(o, pfad, "kruemmung");
+    return k;
 }
 
 Reifen lies_reifen(Leser& leser, const json& o, const std::string& pfad) {
@@ -118,11 +128,13 @@ Reifen lies_reifen(Leser& leser, const json& o, const std::string& pfad) {
     r.nennlast = leser.zahl(o, pfad, "nennlast");
     r.lastempfindlichkeit = leser.zahl(o, pfad, "lastempfindlichkeit");
     r.traegheit = leser.zahl(o, pfad, "traegheit");
-    const std::string laengs = unter(pfad, "laengs");
-    const json& l = leser.objekt(o, pfad, "laengs");
-    r.laengs.steifigkeit = leser.zahl(l, laengs, "steifigkeit");
-    r.laengs.form = leser.zahl(l, laengs, "form");
-    r.laengs.kruemmung = leser.zahl(l, laengs, "kruemmung");
+    r.relaxationslaenge = leser.zahl(o, pfad, "relaxationslaenge");
+    r.laengs = lies_kurvenform(leser, leser.objekt(o, pfad, "laengs"), unter(pfad, "laengs"));
+    r.quer = lies_kurvenform(leser, leser.objekt(o, pfad, "quer"), unter(pfad, "quer"));
+    const std::string kombiniert = unter(pfad, "kombiniert");
+    const json& g = leser.objekt(o, pfad, "kombiniert");
+    r.kombiniert.laengs = leser.zahl(g, kombiniert, "laengs");
+    r.kombiniert.quer = leser.zahl(g, kombiniert, "quer");
     return r;
 }
 
@@ -141,7 +153,8 @@ Achse lies_achse(Leser& leser, const json& achsen, const std::string& name) {
 
 std::string element(const std::string& pfad, std::size_t index) { return pfad + "[" + std::to_string(index) + "]"; }
 
-constexpr double u_min = 2.0 * 3.14159265358979323846 / 60.0; // rad/s je U/min
+constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
+constexpr double grad = std::numbers::pi / 180.0;       // rad je Grad
 
 Antrieb lies_antrieb(Leser& leser, const json& wurzel) {
     Antrieb a;
@@ -240,7 +253,11 @@ void pruefe_reifen(Plausibilitaet& p, const Reifen& r, const std::string& pfad) 
     p.positiv(r.nennlast, unter(pfad, "nennlast"));
     p.bereich(r.lastempfindlichkeit, 0.0, 1.0, unter(pfad, "lastempfindlichkeit"));
     p.positiv(r.traegheit, unter(pfad, "traegheit"));
+    p.positiv(r.relaxationslaenge, unter(pfad, "relaxationslaenge"));
     pruefe_kurvenform(p, r.laengs, unter(pfad, "laengs"));
+    pruefe_kurvenform(p, r.quer, unter(pfad, "quer"));
+    p.nicht_negativ(r.kombiniert.laengs, unter(pfad, "kombiniert.laengs"));
+    p.nicht_negativ(r.kombiniert.quer, unter(pfad, "kombiniert.quer"));
 }
 
 void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
@@ -253,6 +270,7 @@ void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
     p.nicht_negativ(a.fahrwerk.daempfer_zug, unter(fw, "daempfer_zug"));
     p.positiv(a.fahrwerk.federweg, unter(fw, "federweg"));
     p.nicht_negativ(a.fahrwerk.anschlagrate, unter(fw, "anschlagrate"));
+    p.nicht_negativ(a.fahrwerk.stabilisator, unter(fw, "stabilisator"));
     pruefe_reifen(p, a.reifen, unter(pfad, "reifen"));
 }
 
@@ -308,6 +326,9 @@ std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     const double halbe_spur = std::min(k.vorn.spurweite, k.hinten.spurweite) / 2.0;
     p.zwischen(k.schwerpunkt.y, {-halbe_spur, "rechtem Rad"}, {halbe_spur, "linkem Rad"}, "schwerpunkt.y");
     p.positiv(k.schwerpunkt.z, "schwerpunkt.z");
+    // Bis 60° bleibt der Einschlag weit weg vom Querstellen des Rads.
+    p.positiv(k.lenkung.max_lenkwinkel, "lenkung.max_lenkwinkel_grad");
+    p.hoechstens(k.lenkung.max_lenkwinkel / grad, 60.0, "lenkung.max_lenkwinkel_grad");
     p.nicht_negativ(k.bremsen.moment, "bremsen.moment");
     p.bereich(k.bremsen.balance, 0.0, 1.0, "bremsen.balance");
     pruefe_motor(p, k.antrieb.motor, "antrieb.motor");
@@ -374,6 +395,8 @@ LadeErgebnis lies_fahrzeugdatei(std::string_view text) {
     const json& achsen = leser.objekt(wurzel, "", "achsen");
     k.vorn = lies_achse(leser, achsen, "vorn");
     k.hinten = lies_achse(leser, achsen, "hinten");
+    k.lenkung.max_lenkwinkel =
+        leser.zahl(leser.objekt(wurzel, "", "lenkung"), "lenkung", "max_lenkwinkel_grad") * grad;
     const json& bremsen = leser.objekt(wurzel, "", "bremsen");
     k.bremsen.moment = leser.zahl(bremsen, "bremsen", "moment");
     k.bremsen.balance = leser.zahl(bremsen, "bremsen", "balance");
