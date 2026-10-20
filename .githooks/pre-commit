@@ -1,6 +1,10 @@
 #!/bin/sh
 # Baut mit Sanitizern und -Werror und führt alle Tests aus. Aktivieren: git config core.hooksPath .githooks
 # Still bei Erfolg, volle Ausgabe nur bei einem Fehler.
+"$(dirname "$0")/check-einheiten.sh" >&2 || {
+    echo "pre-commit: Einheiten-/Header-Prüfung fehlgeschlagen" >&2
+    exit 1
+}
 log=$(mktemp) || exit 1
 trap 'rm -f "$log"' EXIT
 echo "pre-commit: Prüflauf läuft (cmake --workflow --preset pruefen)..." >&2
