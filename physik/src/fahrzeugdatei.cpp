@@ -128,6 +128,7 @@ Reifen lies_reifen(Leser& leser, const json& o, const std::string& pfad) {
     r.nennlast = leser.zahl(o, pfad, "nennlast");
     r.lastempfindlichkeit = leser.zahl(o, pfad, "lastempfindlichkeit");
     r.traegheit = leser.zahl(o, pfad, "traegheit");
+    r.rollwiderstand = leser.zahl(o, pfad, "rollwiderstand");
     r.relaxationslaenge = leser.zahl(o, pfad, "relaxationslaenge");
     r.laengs = lies_kurvenform(leser, leser.objekt(o, pfad, "laengs"), unter(pfad, "laengs"));
     r.quer = lies_kurvenform(leser, leser.objekt(o, pfad, "quer"), unter(pfad, "quer"));
@@ -146,6 +147,7 @@ Achse lies_achse(Leser& leser, const json& achsen, const std::string& name) {
     a.spurweite = leser.zahl(o, pfad, "spurweite");
     a.anlenkhoehe = leser.zahl(o, pfad, "anlenkhoehe");
     a.radradius = leser.zahl(o, pfad, "radradius");
+    a.abtrieb = leser.zahl(o, pfad, "abtrieb");
     a.fahrwerk = lies_fahrwerk(leser, leser.objekt(o, pfad, "fahrwerk"), unter(pfad, "fahrwerk"));
     a.reifen = lies_reifen(leser, leser.objekt(o, pfad, "reifen"), unter(pfad, "reifen"));
     return a;
@@ -299,6 +301,8 @@ void pruefe_reifen(Plausibilitaet& p, const Reifen& r, const std::string& pfad) 
     p.positiv(r.nennlast, unter(pfad, "nennlast"));
     p.bereich(r.lastempfindlichkeit, 0.0, 1.0, unter(pfad, "lastempfindlichkeit"));
     p.positiv(r.traegheit, unter(pfad, "traegheit"));
+    // Echte Reifen rollen mit 0,005 bis 0,03; darüber ist es ein Tippfehler.
+    p.bereich(r.rollwiderstand, 0.0, 0.1, unter(pfad, "rollwiderstand"));
     p.positiv(r.relaxationslaenge, unter(pfad, "relaxationslaenge"));
     pruefe_kurvenform(p, r.laengs, unter(pfad, "laengs"));
     pruefe_kurvenform(p, r.quer, unter(pfad, "quer"));
@@ -310,6 +314,7 @@ void pruefe_achse(Plausibilitaet& p, const Achse& a, const std::string& pfad) {
     p.positiv(a.spurweite, unter(pfad, "spurweite"));
     p.positiv(a.anlenkhoehe, unter(pfad, "anlenkhoehe"));
     p.positiv(a.radradius, unter(pfad, "radradius"));
+    p.nicht_negativ(a.abtrieb, unter(pfad, "abtrieb"));
     const std::string fw = unter(pfad, "fahrwerk");
     p.positiv(a.fahrwerk.federrate, unter(fw, "federrate"));
     p.nicht_negativ(a.fahrwerk.daempfer_druck, unter(fw, "daempfer_druck"));
@@ -359,7 +364,7 @@ void pruefe_getriebe(Plausibilitaet& p, const Getriebe& g, const std::string& pf
 // Aufeinanderfolgende Gänge: kleinstes Verhältnis der Übersetzung eines Gangs
 // zu der seines Vorgängers, also der größte Drehzahlsprung beim Hochschalten.
 double groesster_sprung(const Getriebe& g) {
-    double sprung = 1.0;
+    double sprung = 1.0; // 1
     for (std::size_t i = 1; i < g.uebersetzungen.size(); ++i) {
         sprung = std::min(sprung, g.uebersetzungen[i] / g.uebersetzungen[i - 1]);
     }
@@ -374,10 +379,11 @@ void pruefe_automatik(Plausibilitaet& p, const Antrieb& a, const std::string& pf
     p.positiv(m.runterschaltdrehzahl, unter(pfad, "runterschalt_u_min"));
     // Nach dem Hochschalten muss die Drehzahl über der Runterschaltschwelle bleiben,
     // sonst schaltet die Automatik sofort wieder zurück und pendelt.
-    if (!(m.runterschaltdrehzahl < m.hochschaltdrehzahl * groesster_sprung(a.getriebe))) {
+    const double drehzahl_nach_hochschalten = m.hochschaltdrehzahl * groesster_sprung(a.getriebe); // rad/s
+    if (!(m.runterschaltdrehzahl < drehzahl_nach_hochschalten)) {
         p.melde(unter(pfad, "runterschalt_u_min"),
                 "muss unter der Drehzahl liegen, auf die das Hochschalten fällt (" +
-                    zahl_als_text(m.hochschaltdrehzahl * groesster_sprung(a.getriebe) / u_min) +
+                    zahl_als_text(drehzahl_nach_hochschalten / u_min) +
                     "), sonst pendelt die Automatik");
     }
     if (!(m.bremsschaltdrehzahl >= m.runterschaltdrehzahl && m.bremsschaltdrehzahl < m.hochschaltdrehzahl)) {
@@ -423,6 +429,7 @@ std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     const double halbe_spur = std::min(k.vorn.spurweite, k.hinten.spurweite) / 2.0;
     p.zwischen(k.schwerpunkt.y, {-halbe_spur, "rechtem Rad"}, {halbe_spur, "linkem Rad"}, "schwerpunkt.y");
     p.positiv(k.schwerpunkt.z, "schwerpunkt.z");
+    p.positiv(k.aero.luftwiderstand, "aero.luftwiderstand");
     // Bis 60° bleibt der Einschlag weit weg vom Querstellen des Rads.
     p.positiv(k.lenkung.max_lenkwinkel, "lenkung.max_lenkwinkel_grad");
     p.hoechstens(k.lenkung.max_lenkwinkel / grad, 60.0, "lenkung.max_lenkwinkel_grad");
@@ -513,6 +520,7 @@ LadeErgebnis lies_fahrzeugdatei(std::string_view text) {
     const json& achsen = leser.objekt(wurzel, "", "achsen");
     k.vorn = lies_achse(leser, achsen, "vorn");
     k.hinten = lies_achse(leser, achsen, "hinten");
+    k.aero.luftwiderstand = leser.zahl(leser.objekt(wurzel, "", "aero"), "aero", "luftwiderstand");
     k.lenkung.max_lenkwinkel =
         leser.zahl(leser.objekt(wurzel, "", "lenkung"), "lenkung", "max_lenkwinkel_grad") * grad;
     const json& bremsen = leser.objekt(wurzel, "", "bremsen");

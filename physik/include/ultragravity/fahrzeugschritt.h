@@ -9,6 +9,9 @@
 
 namespace ultragravity {
 
+// Dichte der Luft, aus der Luftwiderstand und Abtrieb ihre Kraft ziehen.
+inline constexpr double luftdichte = 1.2; // kg/m³
+
 // Reihenfolge der Räder in allen Feldern pro Rad.
 enum Rad { vorn_links = 0, vorn_rechts = 1, hinten_links = 2, hinten_rechts = 3 };
 

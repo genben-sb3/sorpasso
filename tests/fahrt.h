@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <numbers>
 #include <cstdint>
 #include <numbers>
 #include <optional>
@@ -12,6 +15,9 @@ namespace ultragravity::test {
 
 inline constexpr double hundert_kmh = 100.0 / 3.6; // m/s
 inline constexpr double u_min = 2.0 * std::numbers::pi / 60.0; // rad/s je U/min
+
+
+inline double drehzahl(const Testwelt& welt) { return welt.letzter_schritt().animationsdaten.drehzahl; }
 
 inline Kennwerte sportcoupe() {
     LadeErgebnis ergebnis = lade_fahrzeugdatei(UG_FAHRZEUGE_DIR "/sportcoupe.json");
@@ -97,6 +103,61 @@ private:
     int richtung_ = 0;
     int wechsel_in_folge_ = 0;
     int laengste_folge_ = 0;
+};
+
+// Fährt an und schaltet kurz vor dem Begrenzer hoch: Kupplung treten, Gas weg,
+// nächster Gang, nach der Schaltzeit die Kupplung zügig kommen lassen. In den
+// unteren Gängen gibt er nur so viel Gas, dass die Hinterräder kaum durchdrehen.
+class Testfahrer {
+public:
+    static constexpr double einlegen = 0.3;         // s Kupplung getreten vor dem Anfahren
+    static constexpr double kupplung_anfahren = 0.5; // s zum Kommenlassen beim Anfahren
+    static constexpr double kupplung_schalten = 0.15; // s zum Kommenlassen nach dem Schalten
+    static constexpr double schaltdrehzahl = 6800.0 * u_min;
+    static constexpr std::array<double, 3> gas_untere_gaenge{0.75, 0.95, 1.0}; // 1
+
+    explicit Testfahrer(const Kennwerte& k)
+        : gaenge_(static_cast<int>(k.antrieb.getriebe.uebersetzungen.size())),
+          schaltpause_(k.antrieb.getriebe.schaltzeit + 0.05) {}
+
+    EingabePaket paket(const Testwelt& welt) {
+        EingabePaket p;
+        p.gangwunsch = static_cast<std::int8_t>(gang_);
+        if (zeit_ < einlegen) {
+            p.kupplung = 1.0;
+        } else if (zeit_ < einlegen + kupplung_anfahren) {
+            p.gas = gas();
+            p.kupplung = 1.0 - (zeit_ - einlegen) / kupplung_anfahren;
+        } else {
+            const double seit_schalten = zeit_ - geschaltet_;
+            if (gang_ < gaenge_ && seit_schalten > schaltpause_ + kupplung_schalten &&
+                drehzahl(welt) > schaltdrehzahl) {
+                ++gang_;
+                geschaltet_ = zeit_;
+                p.gangwunsch = static_cast<std::int8_t>(gang_);
+                p.kupplung = 1.0;
+            } else if (seit_schalten < schaltpause_) {
+                p.kupplung = 1.0;
+            } else {
+                p.gas = gas();
+                p.kupplung = std::max(1.0 - (seit_schalten - schaltpause_) / kupplung_schalten, 0.0);
+            }
+        }
+        zeit_ += Testwelt::zeitschritt;
+        return p;
+    }
+
+    int gang() const { return gang_; }
+    bool eingekuppelt() const { return zeit_ - geschaltet_ > schaltpause_ + kupplung_schalten; }
+
+private:
+    double gas() const { return gang_ <= 3 ? gas_untere_gaenge[gang_ - 1] : 1.0; }
+
+    int gaenge_;
+    double schaltpause_; // s
+    int gang_ = 1;
+    double zeit_ = 0.0;        // s seit Beginn des Anfahrens
+    double geschaltet_ = -1e9; // s, Zeitpunkt des letzten Gangwechsels
 };
 
 } // namespace ultragravity::test

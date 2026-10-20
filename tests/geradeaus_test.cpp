@@ -43,8 +43,9 @@ TEST_CASE("Der Bremsweg aus 100 km/h auf trockenem Belag folgt aus μ·g") {
     Fahrt fahrt(welt);
     fahrt.fahre(1.5); // einfedern lassen
 
+    // Während des Einfederns kosten Luft- und Rollwiderstand rund 2 %.
     const double v = laengsgeschwindigkeit(welt);
-    REQUIRE(v == doctest::Approx(hundert_kmh).epsilon(0.01));
+    REQUIRE(v == doctest::Approx(hundert_kmh).epsilon(0.03));
     const double weg = bremsweg(welt, fahrt);
 
     CAPTURE(weg);
