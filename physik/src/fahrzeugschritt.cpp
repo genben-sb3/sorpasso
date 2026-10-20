@@ -163,6 +163,7 @@ struct Reifenkraft {
     double quer = 0.0;       // N
     double steigung = 0.0;   // N·s/rad, Ableitung der Längskraft nach der Raddrehzahl
     double grenze = 0.0;     // N, was der Schräglauf an Längskraft übrig lässt
+    double schlupf = 0.0;    // 1, Längsschlupf
 };
 
 // Reifenkräfte eines Rads mit Kontakt bei der Geschwindigkeit v im Kontaktpunkt.
@@ -182,6 +183,7 @@ Reifenkraft reifenkraft(const Radlage& rad, Vec3 v, double omega, double h, doub
     const double schlupf = (omega * r - vx) / nenner; // 1
     const Kurvenpunkt kurve = magic_formula(reifen.laengs, schlupf);
     Reifenkraft k;
+    k.schlupf = schlupf;
     k.grenze = rad.haftkraft * gewichtung(reifen.kombiniert.laengs, schraeglauf);
     k.laengs = k.grenze * kurve.wert;
     k.steigung = k.grenze * std::max(kurve.steigung, 0.0) * r / nenner;
@@ -489,6 +491,9 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
             if (!rad.kontakt) continue;
             const Vec3 kraft = rad.laengs * fx + rad.quer * k.quer; // N
             reifenkraft_gesamt += kraft;
+            ergebnis.telemetrie.schlupf[i] += k.schlupf * gewicht_zwischenschritt;
+            ergebnis.telemetrie.kraft_laengs[i] += fx * gewicht_zwischenschritt;
+            ergebnis.telemetrie.kraft_quer[i] += k.quer * gewicht_zwischenschritt;
             ergebnis.kraefte.kraft += kraft * gewicht_zwischenschritt;
             ergebnis.kraefte.moment += kreuz(rad.hebel, kraft) * gewicht_zwischenschritt;
         }
@@ -551,6 +556,8 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     anim.wanken = std::asin(std::clamp(drehe(karosserie.ausrichtung, {0.0, 1.0, 0.0}).z, -1.0, 1.0));
     anim.lenkrad = std::clamp(eingabe.lenkung, -1.0, 1.0) * lenkrad_ausschlag;
     anim.drehzahl = ergebnis.zustand.motordrehzahl;
+    ergebnis.telemetrie.schraeglauf = ergebnis.zustand.schraeglauf;
+    ergebnis.telemetrie.geschwindigkeit = skalar(karosserie.geschwindigkeit, vorn);
     return ergebnis;
 }
 
