@@ -2,35 +2,35 @@
 
 #include <cmath>
 
-#include "ultragravity/fahrzeugdatei.h"
+#include "ultragravity/vehicle_file.h"
 
 namespace ultragravity {
 
-// Magic Formula über einem Schlupf, normiert auf den Spitzenwert 1, samt ihrer
-// Ableitung nach dem Schlupf.
-struct Kurvenpunkt {
-    double wert;
-    double steigung;
+// Magic Formula over a slip, normalized to a peak value of 1, together with its
+// derivative with respect to the slip.
+struct CurvePoint {
+    double value; // 1
+    double slope; // 1 per unit of slip
 };
 
-inline Kurvenpunkt magic_formula(const Kurvenform& k, double schlupf) {
-    const double b = k.steifigkeit;
-    const double bx = b * schlupf;
-    const double phi = bx - k.kruemmung * (bx - std::atan(bx));
-    const double dphi = b - k.kruemmung * (b - b / (1.0 + bx * bx));
-    const double winkel = k.form * std::atan(phi);
-    return {std::sin(winkel), std::cos(winkel) * k.form / (1.0 + phi * phi) * dphi};
+inline CurvePoint magic_formula(const CurveShape& k, double slip) {
+    const double b = k.stiffness;                                      // 1 per unit of slip
+    const double bx = b * slip;                                        // 1
+    const double phi = bx - k.curvature * (bx - std::atan(bx));        // 1
+    const double dphi = b - k.curvature * (b - b / (1.0 + bx * bx));   // 1 per unit of slip
+    const double angle = k.shape * std::atan(phi);                     // 1
+    return {std::sin(angle), std::cos(angle) * k.shape / (1.0 + phi * phi) * dphi};
 }
 
-// Schlupf, bei dem die Kurve ihren Spitzenwert erreicht (Steigung null), für
-// eine Kurve mit Spitze unterhalb von grenze.
-inline double spitzenschlupf(const Kurvenform& k, double grenze) {
-    double unten = 0.0, oben = grenze; // gleiche Einheit wie der Schlupf
+// Slip at which the curve reaches its peak (slope zero), for a curve whose
+// peak lies below limit.
+inline double peak_slip(const CurveShape& k, double limit) {
+    double low = 0.0, high = limit; // same unit as the slip
     for (int i = 0; i < 60; ++i) {
-        const double mitte = 0.5 * (unten + oben); // wie der Schlupf
-        (magic_formula(k, mitte).steigung > 0.0 ? unten : oben) = mitte;
+        const double mid = 0.5 * (low + high); // same unit as the slip
+        (magic_formula(k, mid).slope > 0.0 ? low : high) = mid;
     }
-    return 0.5 * (unten + oben);
+    return 0.5 * (low + high);
 }
 
 } // namespace ultragravity

@@ -1,24 +1,24 @@
 using System.IO;
 using UnrealBuildTool;
 
-// Physikpaket ultragravity: Standard-C++ in SI und ISO 8855, kennt Unreal nicht. Dieselben Quellen
-// baut das CMake-Projekt unter ultragravity/ mit doctest; dort laufen die Physik-Tests.
+// Physics package ultragravity: standard C++ in SI and ISO 8855, does not know Unreal. The CMake project
+// under ultragravity/ builds the same sources with doctest; the physics tests run there.
 public class UltraGravity : ModuleRules
 {
 	public UltraGravity(ReadOnlyTargetRules Target) : base(Target)
 	{
-		// Die Paket-Quellen binden keine Unreal-Header ein, also auch keinen Unreal-PCH.
+		// The package sources include no Unreal headers, so no Unreal PCH either.
 		PCHUsage = PCHUsageMode.NoPCHs;
 
-		// Mehrere Quellen haben gleichnamige Helfer in anonymen Namensräumen; ein Unity-Build würde sie zusammenwerfen.
+		// Several sources have helpers of the same name in anonymous namespaces; a unity build would merge them.
 		bUseUnity = false;
 
-		// Öffentliche Header werden als "ultragravity/<name>.h" eingebunden (Public/ liegt automatisch im Include-Pfad).
-		// nlohmann json bleibt ein Detail des Ladecodes und ist nach außen nicht sichtbar.
+		// Public headers are included as "ultragravity/<name>.h" (Public/ is on the include path automatically).
+		// nlohmann json stays a detail of the loading code and is not visible outside.
 		PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "ThirdParty"));
 		PrivateDefinitions.Add("JSON_NOEXCEPTION");
 
-		// Nur für IMPLEMENT_MODULE in UltraGravityModule.cpp; die Paket-Quellen hängen von keinem Unreal-Modul ab.
+		// Only for IMPLEMENT_MODULE in UltraGravityModule.cpp; the package sources depend on no Unreal module.
 		PrivateDependencyModuleNames.Add("Core");
 	}
 }

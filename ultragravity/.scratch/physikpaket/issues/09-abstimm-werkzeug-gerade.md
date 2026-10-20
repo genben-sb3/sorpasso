@@ -13,5 +13,5 @@
 - [ ] Der Testfahrer erzeugt ausschließlich Eingabe-Pakete.
 
 ## Comments
-- Aus 06: Der Test „…0–100 km/h in plausibler Zeit“ in `tests/antrieb_test.cpp` lässt 4,5…7,0 s durch (gemessen 6,0 s). Mit dem Testmanöver hier das Band schärfen und den groben Anfahrvorgang des Testfahrers dort verbessern.
-- Aus 15: Das Werkzeug soll die Telemetrie eines Testmanövers auf Wunsch in eine Datei schreiben (offenes Kriterium aus 15). Dafür gibt es `schreibe_telemetrie_kopfzeile` und `schreibe_telemetrie_zeile` in `ultragravity/telemetrie_csv.h`; das Werkzeug ruft sie mit einem `std::ofstream` auf.
+- Aus 06: Der Test „…0–100 km/h in plausibler Zeit“ in `tests/drivetrain_test.cpp` lässt 4,5…7,0 s durch (gemessen 6,0 s). Mit dem Testmanöver hier das Band schärfen und den groben Anfahrvorgang des Testfahrers dort verbessern.
+- Aus 15: Das Werkzeug soll die Telemetrie eines Testmanövers auf Wunsch in eine Datei schreiben (offenes Kriterium aus 15). Dafür gibt es `write_telemetry_header` und `write_telemetry_row` in `ultragravity/telemetry_csv.h`; das Werkzeug ruft sie mit einem `std::ofstream` auf.

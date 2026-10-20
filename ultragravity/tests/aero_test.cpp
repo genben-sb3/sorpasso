@@ -3,187 +3,187 @@
 #include <algorithm>
 #include <cmath>
 
-#include "fahrt.h"
+#include "drive.h"
 
 using namespace ultragravity;
 using namespace ultragravity::test;
 
 namespace {
 
-// Eigener Oracle-Wert, bewusst nicht aus dem Physikpaket übernommen.
-constexpr double luftdichte = 1.2; // kg/m³
+// Independent oracle value, deliberately not taken from the physics package.
+constexpr double air_density = 1.2; // kg/m³
 
-constexpr double erdbeschleunigung = Testwelt::erdbeschleunigung; // m/s²
+constexpr double gravity = TestWorld::gravity; // m/s²
 
-double abtriebskraft(double flaeche, double v) { return 0.5 * luftdichte * flaeche * v * v; } // N
+double downforce(double area, double v) { return 0.5 * air_density * area * v * v; } // N
 
-double gesamtabtrieb(const Kennwerte& k, double v) { return abtriebskraft(k.vorn.abtrieb + k.hinten.abtrieb, v); } // N
+double total_downforce(const VehicleParams& k, double v) { return downforce(k.front.downforce + k.rear.downforce, v); } // N
 
-// Fahrwiderstand im Geradeauslauf bei der Geschwindigkeit v: Luftwiderstand
-// plus Rollwiderstand auf der Radlast samt Abtrieb.
-double fahrwiderstand(const Kennwerte& k, double v) {
-    const double luft = 0.5 * luftdichte * k.aero.luftwiderstand * v * v;
-    const double rollen = k.hinten.reifen.rollwiderstand * (k.masse * erdbeschleunigung + gesamtabtrieb(k, v));
-    return luft + rollen;
+// Driving resistance in straight-line running at speed v: aerodynamic drag
+// plus rolling resistance on the wheel load including downforce.
+double driving_resistance(const VehicleParams& k, double v) {
+    const double air = 0.5 * air_density * k.aero.drag_area * v * v;
+    const double rolling = k.rear.tire.rolling_resistance * (k.mass * gravity + total_downforce(k, v));
+    return air + rolling;
 }
 
-// Antriebskraft am Boden bei Vollgas im höchsten Gang, ohne Verluste.
-double antriebskraft(const Kennwerte& k, double v) {
-    const Motor& m = k.antrieb.motor;
-    const double gesamt = k.antrieb.getriebe.uebersetzungen.back() * k.antrieb.getriebe.achsuebersetzung;
-    const double drehzahl = v / k.hinten.radradius * gesamt;
-    if (drehzahl >= m.hoechstdrehzahl) return 0.0;
-    double moment = m.drehmoment.back().moment;
-    for (std::size_t i = 1; i < m.drehmoment.size(); ++i) {
-        if (drehzahl <= m.drehmoment[i].drehzahl) {
-            const Stuetzpunkt& a = m.drehmoment[i - 1];
-            const Stuetzpunkt& b = m.drehmoment[i];
-            moment = a.moment + (b.moment - a.moment) * (drehzahl - a.drehzahl) / (b.drehzahl - a.drehzahl);
+// Drive force at the ground at full throttle in top gear, without losses.
+double drive_force(const VehicleParams& k, double v) {
+    const Engine& e = k.drivetrain.engine;
+    const double overall = k.drivetrain.gearbox.ratios.back() * k.drivetrain.gearbox.final_drive;
+    const double speed = v / k.rear.wheel_radius * overall;
+    if (speed >= e.rev_limit) return 0.0;
+    double torque = e.torque_curve.back().torque;
+    for (std::size_t i = 1; i < e.torque_curve.size(); ++i) {
+        if (speed <= e.torque_curve[i].speed) {
+            const TorquePoint& a = e.torque_curve[i - 1];
+            const TorquePoint& b = e.torque_curve[i];
+            torque = a.torque + (b.torque - a.torque) * (speed - a.speed) / (b.speed - a.speed);
             break;
         }
     }
-    return moment * gesamt / k.hinten.radradius;
+    return torque * overall / k.rear.wheel_radius;
 }
 
 } // namespace
 
-TEST_CASE("Die Höchstgeschwindigkeit liegt dort, wo Antriebskraft und Fahrwiderstand im Gleichgewicht sind") {
-    const Kennwerte auto_ = sportcoupe();
+TEST_CASE("The top speed lies where drive force and driving resistance are in balance") {
+    const VehicleParams car = sports_coupe();
 
-    // Gleichgewicht der Kräfte im sechsten Gang per Intervallhalbierung.
-    double unten = 20.0; // m/s
-    double oben = 100.0; // m/s
+    // Balance of forces in sixth gear by bisection.
+    double low = 20.0;   // m/s
+    double high = 100.0; // m/s
     for (int i = 0; i < 60; ++i) {
-        const double mitte = (unten + oben) / 2.0;
-        (antriebskraft(auto_, mitte) > fahrwiderstand(auto_, mitte) ? unten : oben) = mitte;
+        const double mid = (low + high) / 2.0;
+        (drive_force(car, mid) > driving_resistance(car, mid) ? low : high) = mid;
     }
-    const double erwartet = unten;
-    REQUIRE(erwartet * 3.6 > 250.0); // ein Sportcoupé mit 300 PS
-    REQUIRE(erwartet * 3.6 < 300.0);
+    const double expected = low;
+    REQUIRE(expected * 3.6 > 250.0); // a sports coupe with 300 hp
+    REQUIRE(expected * 3.6 < 300.0);
 
-    Testwelt welt(auto_, 0.02);
-    Fahrt fahrt(welt);
-    fahrt.fahre(1.5);
-    Testfahrer fahrer(auto_);
-    double zeit = 0.0;
-    while (fahrer.gang() < 6 || !fahrer.eingekuppelt()) {
-        REQUIRE(zeit < 60.0);
-        fahrt.einen_tick(fahrer.paket(welt));
-        zeit += Testwelt::zeitschritt;
+    TestWorld world(car, 0.02);
+    Drive drive(world);
+    drive.run(1.5);
+    TestDriver driver(car);
+    double time = 0.0;
+    while (driver.gear() < 6 || !driver.clutch_engaged()) {
+        REQUIRE(time < 60.0);
+        drive.one_tick(driver.packet(world));
+        time += TestWorld::time_step;
     }
-    EingabePaket vollgas = fahrer.paket(welt);
-    REQUIRE(vollgas.gas == 1.0);
-    // Das Auto läuft nur asymptotisch auf die Höchstgeschwindigkeit zu.
-    fahrt.fahre(120.0, vollgas);
+    InputPacket full_throttle = driver.packet(world);
+    REQUIRE(full_throttle.throttle == 1.0);
+    // The car only approaches the top speed asymptotically.
+    drive.run(120.0, full_throttle);
 
-    const double v = laengsgeschwindigkeit(welt);
+    const double v = forward_speed(world);
     CAPTURE(v * 3.6);
-    CAPTURE(erwartet * 3.6);
-    // Die Reifen verlieren auf der Strecke etwas Schlupf an die Antriebskraft; 2 % reichen dafür.
-    CHECK(v == doctest::Approx(erwartet).epsilon(0.02));
-    // Ohne mehr Leistung wird es nicht schneller: die Beschleunigung ist weg.
-    const double v_vorher = v;
-    fahrt.fahre(5.0, vollgas);
-    CHECK(laengsgeschwindigkeit(welt) - v_vorher < 0.3);
+    CAPTURE(expected * 3.6);
+    // The tires lose some slip to the drive force along the way; 2 % covers that.
+    CHECK(v == doctest::Approx(expected).epsilon(0.02));
+    // Without more power it gets no faster: the acceleration is gone.
+    const double v_before = v;
+    drive.run(5.0, full_throttle);
+    CHECK(forward_speed(world) - v_before < 0.3);
 }
 
-TEST_CASE("Ohne Gas und Bremse rollt das Auto im Leerlauf nach dem Fahrwiderstand aus") {
-    const Kennwerte auto_ = sportcoupe();
-    Testwelt welt(auto_, 0.02, Testgelaende{}, hundert_kmh);
-    Fahrt fahrt(welt);
-    fahrt.fahre(1.0); // einfedern lassen
+TEST_CASE("Without throttle and brake the car coasts down in neutral according to the driving resistance") {
+    const VehicleParams car = sports_coupe();
+    TestWorld world(car, 0.02, TestGround{}, kmh_100);
+    Drive drive(world);
+    drive.run(1.0); // let the suspension settle
 
-    // Erwartung: dv/dt = −F_Widerstand(v)/m, einfach integriert.
-    double v = laengsgeschwindigkeit(welt);
-    double v_vorher = v;
-    double erwartet = v;
+    // Expectation: dv/dt = −F_resistance(v)/m, simply integrated.
+    double v = forward_speed(world);
+    double v_before = v;
+    double expected = v;
     constexpr double dt = 0.005;
-    const auto integriere = [&](double sekunden) {
-        for (int i = 0; i < static_cast<int>(sekunden / dt); ++i) erwartet -= fahrwiderstand(auto_, erwartet) / auto_.masse * dt;
+    const auto integrate = [&](double seconds) {
+        for (int i = 0; i < static_cast<int>(seconds / dt); ++i) expected -= driving_resistance(car, expected) / car.mass * dt;
     };
 
-    const double anfangsverzoegerung = fahrwiderstand(auto_, v) / auto_.masse;
-    fahrt.fahre(1.0);
-    CHECK(v_vorher - laengsgeschwindigkeit(welt) == doctest::Approx(anfangsverzoegerung).epsilon(0.1));
+    const double initial_deceleration = driving_resistance(car, v) / car.mass;
+    drive.run(1.0);
+    CHECK(v_before - forward_speed(world) == doctest::Approx(initial_deceleration).epsilon(0.1));
 
-    // Über 40 s verzögert er immer sanfter, und die Geschwindigkeit folgt dem Modell.
-    integriere(2.0);
-    double letzte_abnahme = 1e9;
-    for (int abschnitt = 0; abschnitt < 4; ++abschnitt) {
-        v = laengsgeschwindigkeit(welt);
-        fahrt.fahre(10.0);
-        const double abnahme = v - laengsgeschwindigkeit(welt);
-        CAPTURE(abschnitt);
-        CHECK(abnahme > 0.0);
-        CHECK(abnahme < letzte_abnahme);
-        letzte_abnahme = abnahme;
-        integriere(10.0);
+    // Over 40 s it decelerates ever more gently, and the speed follows the model.
+    integrate(2.0);
+    double last_decrease = 1e9;
+    for (int section = 0; section < 4; ++section) {
+        v = forward_speed(world);
+        drive.run(10.0);
+        const double decrease = v - forward_speed(world);
+        CAPTURE(section);
+        CHECK(decrease > 0.0);
+        CHECK(decrease < last_decrease);
+        last_decrease = decrease;
+        integrate(10.0);
     }
-    CAPTURE(laengsgeschwindigkeit(welt));
-    CAPTURE(erwartet);
-    CHECK(laengsgeschwindigkeit(welt) == doctest::Approx(erwartet).epsilon(0.03));
-    // Weder bleibt er sofort stehen noch rollt er ungebremst weiter.
-    CHECK(laengsgeschwindigkeit(welt) > 0.5 * hundert_kmh);
-    CHECK(laengsgeschwindigkeit(welt) < 0.9 * hundert_kmh);
+    CAPTURE(forward_speed(world));
+    CAPTURE(expected);
+    CHECK(forward_speed(world) == doctest::Approx(expected).epsilon(0.03));
+    // It neither stops at once nor rolls on unbraked.
+    CHECK(forward_speed(world) > 0.5 * kmh_100);
+    CHECK(forward_speed(world) < 0.9 * kmh_100);
 }
 
-TEST_CASE("Im Stand und bei langsamer Fahrt gibt es keinen Luftwiderstand und der Rollwiderstand schiebt nicht an") {
-    const Kennwerte auto_ = sportcoupe();
-    Testwelt welt(auto_, 0.02);
-    Fahrt fahrt(welt);
-    fahrt.fahre(3.0);
-    CHECK(std::abs(laengsgeschwindigkeit(welt)) < 1e-3);
+TEST_CASE("At standstill and at low speed there is no aerodynamic drag and the rolling resistance does not push") {
+    const VehicleParams car = sports_coupe();
+    TestWorld world(car, 0.02);
+    Drive drive(world);
+    drive.run(3.0);
+    CHECK(std::abs(forward_speed(world)) < 1e-3);
 }
 
-TEST_CASE("Der Abtrieb drückt die Achse nach unten, an der er angreift") {
-    const Kennwerte ohne = [] {
-        Kennwerte k = sportcoupe();
-        k.vorn.abtrieb = 0.0;
-        k.hinten.abtrieb = 0.0;
+TEST_CASE("The downforce pushes down the axle it acts on") {
+    const VehicleParams without = [] {
+        VehicleParams k = sports_coupe();
+        k.front.downforce = 0.0;
+        k.rear.downforce = 0.0;
         return k;
     }();
     constexpr double v = 200.0 / 3.6; // m/s
 
-    const auto achslasten = [&](const Kennwerte& k) {
-        Testwelt welt(k, 0.02, Testgelaende{}, v);
-        Fahrt fahrt(welt);
-        fahrt.fahre(3.0);
-        const auto& last = welt.letzter_schritt().telemetrie.radlast;
-        return std::array<double, 2>{last[vorn_links] + last[vorn_rechts], last[hinten_links] + last[hinten_rechts]};
+    const auto axle_loads = [&](const VehicleParams& k) {
+        TestWorld world(k, 0.02, TestGround{}, v);
+        Drive drive(world);
+        drive.run(3.0);
+        const auto& load = world.last_step().telemetry.wheel_load;
+        return std::array<double, 2>{load[front_left] + load[front_right], load[rear_left] + load[rear_right]};
     };
-    const auto basis = achslasten(ohne);
+    const auto base = axle_loads(without);
 
-    SUBCASE("nur hinten") {
-        Kennwerte k = ohne;
-        k.hinten.abtrieb = 0.8;
-        const auto last = achslasten(k);
-        CHECK(last[1] - basis[1] == doctest::Approx(abtriebskraft(0.8, v)).epsilon(0.1));
-        CHECK(last[0] - basis[0] == doctest::Approx(0.0).epsilon(0.1).scale(abtriebskraft(0.8, v)));
+    SUBCASE("rear only") {
+        VehicleParams k = without;
+        k.rear.downforce = 0.8;
+        const auto load = axle_loads(k);
+        CHECK(load[1] - base[1] == doctest::Approx(downforce(0.8, v)).epsilon(0.1));
+        CHECK(load[0] - base[0] == doctest::Approx(0.0).epsilon(0.1).scale(downforce(0.8, v)));
     }
 
-    SUBCASE("nur vorn") {
-        Kennwerte k = ohne;
-        k.vorn.abtrieb = 0.8;
-        const auto last = achslasten(k);
-        CHECK(last[0] - basis[0] == doctest::Approx(abtriebskraft(0.8, v)).epsilon(0.1));
-        CHECK(last[1] - basis[1] == doctest::Approx(0.0).epsilon(0.1).scale(abtriebskraft(0.8, v)));
+    SUBCASE("front only") {
+        VehicleParams k = without;
+        k.front.downforce = 0.8;
+        const auto load = axle_loads(k);
+        CHECK(load[0] - base[0] == doctest::Approx(downforce(0.8, v)).epsilon(0.1));
+        CHECK(load[1] - base[1] == doctest::Approx(0.0).epsilon(0.1).scale(downforce(0.8, v)));
     }
 
-    SUBCASE("er wächst mit dem Quadrat der Geschwindigkeit") {
-        Kennwerte k = ohne;
-        k.hinten.abtrieb = 0.8;
-        const double bei_v = achslasten(k)[1] - basis[1];
-        CHECK(bei_v > 0.0);
-        Testwelt langsam(k, 0.02, Testgelaende{}, v / 2.0);
-        Testwelt langsam_ohne(ohne, 0.02, Testgelaende{}, v / 2.0);
-        Fahrt f1(langsam);
-        Fahrt f2(langsam_ohne);
-        f1.fahre(3.0);
-        f2.fahre(3.0);
-        const auto summe = [](const Testwelt& w) {
-            const auto& l = w.letzter_schritt().telemetrie.radlast;
-            return l[hinten_links] + l[hinten_rechts];
+    SUBCASE("it grows with the square of the speed") {
+        VehicleParams k = without;
+        k.rear.downforce = 0.8;
+        const double at_v = axle_loads(k)[1] - base[1];
+        CHECK(at_v > 0.0);
+        TestWorld slow(k, 0.02, TestGround{}, v / 2.0);
+        TestWorld slow_without(without, 0.02, TestGround{}, v / 2.0);
+        Drive d1(slow);
+        Drive d2(slow_without);
+        d1.run(3.0);
+        d2.run(3.0);
+        const auto sum = [](const TestWorld& w) {
+            const auto& l = w.last_step().telemetry.wheel_load;
+            return l[rear_left] + l[rear_right];
         };
-        CHECK(summe(langsam) - summe(langsam_ohne) == doctest::Approx(bei_v / 4.0).epsilon(0.15));
+        CHECK(sum(slow) - sum(slow_without) == doctest::Approx(at_v / 4.0).epsilon(0.15));
     }
 }

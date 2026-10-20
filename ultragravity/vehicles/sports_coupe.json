@@ -1,0 +1,111 @@
+{
+  "name": "Sports Coupe",
+  "mass": 1350.0,
+  "inertia": { "x": 450.0, "y": 1900.0, "z": 2100.0 },
+  "center_of_mass": { "x": -1.248, "y": 0.0, "z": 0.48 },
+  "axles": {
+    "front": {
+      "x": 0.0,
+      "track_width": 1.56,
+      "mount_height": 0.42,
+      "wheel_radius": 0.33,
+      "downforce": 0.15,
+      "suspension": {
+        "spring_rate": 55000.0,
+        "damper_bump": 3000.0,
+        "damper_rebound": 4500.0,
+        "travel": 0.15,
+        "bump_stop_rate": 500000.0,
+        "anti_roll_bar": 25000.0
+      },
+      "tire": {
+        "peak_friction": 1.05,
+        "nominal_load": 3400.0,
+        "load_sensitivity": 0.1,
+        "inertia": 1.2,
+        "rolling_resistance": 0.012,
+        "relaxation_length": 0.3,
+        "longitudinal": {
+          "stiffness": 10.0,
+          "shape": 1.9,
+          "curvature": 0.97
+        },
+        "lateral": {
+          "stiffness": 14.0,
+          "shape": 1.5,
+          "curvature": 0.3
+        },
+        "combined": { "longitudinal": 8.0, "lateral": 10.0 }
+      }
+    },
+    "rear": {
+      "x": -2.6,
+      "track_width": 1.58,
+      "mount_height": 0.42,
+      "wheel_radius": 0.33,
+      "downforce": 0.3,
+      "suspension": {
+        "spring_rate": 50000.0,
+        "damper_bump": 2800.0,
+        "damper_rebound": 4200.0,
+        "travel": 0.15,
+        "bump_stop_rate": 500000.0,
+        "anti_roll_bar": 12000.0
+      },
+      "tire": {
+        "peak_friction": 1.05,
+        "nominal_load": 3200.0,
+        "load_sensitivity": 0.1,
+        "inertia": 1.2,
+        "rolling_resistance": 0.012,
+        "relaxation_length": 0.3,
+        "longitudinal": {
+          "stiffness": 10.0,
+          "shape": 1.9,
+          "curvature": 0.97
+        },
+        "lateral": {
+          "stiffness": 14.0,
+          "shape": 1.5,
+          "curvature": 0.3
+        },
+        "combined": { "longitudinal": 8.0, "lateral": 10.0 }
+      }
+    }
+  },
+  "aero": { "drag_area": 0.72 },
+  "steering": { "max_steer_angle_deg": 35.0 },
+  "brakes": {
+    "torque": 7000.0,
+    "balance": 0.65
+  },
+  "drivetrain": {
+    "layout": "rear",
+    "differential": { "type": "limited_slip", "preload": 80.0, "locking_factor": 0.4 },
+    "engine": {
+      "torque_curve": [
+        { "rpm": 1000.0, "torque": 250.0 },
+        { "rpm": 2000.0, "torque": 310.0 },
+        { "rpm": 3000.0, "torque": 350.0 },
+        { "rpm": 4000.0, "torque": 370.0 },
+        { "rpm": 5000.0, "torque": 370.0 },
+        { "rpm": 6000.0, "torque": 345.0 },
+        { "rpm": 6500.0, "torque": 324.0 },
+        { "rpm": 7500.0, "torque": 270.0 }
+      ],
+      "idle_rpm": 900.0,
+      "rev_limit_rpm": 7200.0,
+      "inertia": 0.2,
+      "drag_torque": 60.0
+    },
+    "clutch": {
+      "torque": 550.0
+    },
+    "gearbox": {
+      "ratios": [3.2, 2.2, 1.6, 1.25, 1.0, 0.82],
+      "final_drive": 3.6,
+      "shift_time": 0.25,
+      "mode": "manual"
+    }
+  }
+}

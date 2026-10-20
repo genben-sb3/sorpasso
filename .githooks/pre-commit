@@ -1,10 +1,10 @@
 #!/bin/sh
-# Prüflauf des Physikpakets: Einheiten-/Header-Prüfung, dann Build mit Sanitizern und -Werror und alle Tests.
-# Läuft nur, wenn der Commit Physik-Dateien enthält (Source/UltraGravity/ oder ultragravity/).
-# Still bei Erfolg, volle Ausgabe nur bei einem Fehler.
+# Check run of the physics package: unit/header check, then a build with sanitizers and -Werror and all tests.
+# Only runs when the commit contains physics files (Source/UltraGravity/ or ultragravity/).
+# Quiet on success, full output only on failure.
 #
-# Aktivieren, ohne die Git-LFS-Hooks in .git/hooks abzuklemmen (core.hooksPath bleibt unverändert;
-# Git LFS belegt pre-commit nicht):
+# Enable without cutting off the Git LFS hooks in .git/hooks (core.hooksPath stays unchanged;
+# Git LFS does not use pre-commit):
 #   ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-commit"
 root=$(git rev-parse --show-toplevel) || exit 1
 
@@ -12,17 +12,17 @@ if git diff --cached --quiet -- Source/UltraGravity ultragravity; then
     exit 0
 fi
 
-"$root/.githooks/check-einheiten.sh" >&2 || {
-    echo "pre-commit: Einheiten-/Header-Prüfung fehlgeschlagen" >&2
+"$root/.githooks/check-units.sh" >&2 || {
+    echo "pre-commit: unit/header check failed" >&2
     exit 1
 }
 log=$(mktemp) || exit 1
 trap 'rm -f "$log"' EXIT
-echo "pre-commit: Prüflauf läuft (cmake --workflow --preset pruefen in ultragravity/)..." >&2
+echo "pre-commit: check run in progress (cmake --workflow --preset pruefen in ultragravity/)..." >&2
 (cd "$root/ultragravity" && cmake --workflow --preset pruefen) >"$log" 2>&1 || {
     rc=$?
     cat "$log" >&2
-    echo "pre-commit: Prüflauf fehlgeschlagen (Exit-Code $rc)" >&2
+    echo "pre-commit: check run failed (exit code $rc)" >&2
     exit "$rc"
 }
-echo "pre-commit: Prüflauf grün" >&2
+echo "pre-commit: check run green" >&2

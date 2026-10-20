@@ -20,13 +20,13 @@ git config core.hooksPath .githooks
 Nur das Physikpaket bauen (das Ziel, das nach APEXLINE umzieht):
 
 ```sh
-cmake --build build --target ultragravity_physik
+cmake --build build --target ultragravity_physics
 ```
 
 ## Aufbau
 
-- `physik/`: das Physikpaket, nur Standardbibliothek, ohne Exceptions und RTTI
-- `testwelt/`: Ersatz für Unreal: starrer Körper, Testgelände, Radkontakte
-- `fahrzeuge/`: Fahrzeugdateien
+- `physics/`: CMake-Ziel des Physikpakets (Quellen im Unreal-Modul `../Source/UltraGravity/`), nur Standardbibliothek, ohne Exceptions und RTTI
+- `test_world/`: Ersatz für Unreal: starrer Körper, Testgelände, Radkontakte
+- `vehicles/`: Fahrzeugdateien
 - `tests/`: doctest-Tests an den Nähten aus der Spec
 - `third_party/`: doctest 2.4.11 (Header plus `cmake/` für `doctest_discover_tests`) und nlohmann/json 3.11.3 als einzelne Header-Datei

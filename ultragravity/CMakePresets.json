@@ -3,7 +3,7 @@
   "configurePresets": [
     {
       "name": "standard",
-      "displayName": "Ninja, Debug mit Optimierung",
+      "displayName": "Ninja, debug info with optimization",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
@@ -13,7 +13,7 @@
     },
     {
       "name": "pruefen",
-      "displayName": "Wie standard, plus Sanitizer, libstdc++-Assertions und -Werror",
+      "displayName": "Like standard, plus sanitizers, libstdc++ assertions and -Werror",
       "inherits": "standard",
       "binaryDir": "${sourceDir}/build-pruefen",
       "cacheVariables": {
@@ -41,7 +41,7 @@
   "workflowPresets": [
     {
       "name": "standard",
-      "displayName": "Konfigurieren, bauen und alle Tests ausführen",
+      "displayName": "Configure, build and run all tests",
       "steps": [
         { "type": "configure", "name": "standard" },
         { "type": "build", "name": "standard" },
@@ -50,7 +50,7 @@
     },
     {
       "name": "pruefen",
-      "displayName": "Wie standard, aber mit Sanitizern und -Werror (läuft im Pre-Commit-Hook)",
+      "displayName": "Like standard, but with sanitizers and -Werror (runs in the pre-commit hook)",
       "steps": [
         { "type": "configure", "name": "pruefen" },
         { "type": "build", "name": "pruefen" },

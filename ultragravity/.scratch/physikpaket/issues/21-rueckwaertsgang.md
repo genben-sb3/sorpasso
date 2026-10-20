@@ -1,6 +1,6 @@
 # 21: Rückwärtsgang
 
-**What to build:** `gangwunsch = -1` im Eingabe-Paket legt den Rückwärtsgang ein, statt wie bisher wie Leerlauf zu wirken. Die Fahrzeugdatei bekommt eine Übersetzung für den Rückwärtsgang. Eingelegt wird er nur nahe am Stillstand, im manuellen Getriebe und in der Automatik gleich.
+**What to build:** `gear_request = -1` im Eingabe-Paket legt den Rückwärtsgang ein, statt wie bisher wie Leerlauf zu wirken. Die Fahrzeugdatei bekommt eine Übersetzung für den Rückwärtsgang. Eingelegt wird er nur nahe am Stillstand, im manuellen Getriebe und in der Automatik gleich.
 
 **Blocked by:** 07
 
@@ -14,4 +14,4 @@
 
 ## Comments
 
-- Aus 06: Dort ist der Rückwärtsgang bewusst weggelassen; `gangwunsch = -1` wirkt bisher wie Leerlauf.
+- Aus 06: Dort ist der Rückwärtsgang bewusst weggelassen; `gear_request = -1` wirkt bisher wie Leerlauf.
