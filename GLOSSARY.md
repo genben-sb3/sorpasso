@@ -46,6 +46,24 @@ _Avoid_: KI, Bot, Autopilot
 Das gewünschte Ergebnis eines Testmanövers für ein bestimmtes Auto.
 _Avoid_: Sollwert, Target
 
+## Fahrverhalten
+
+**Drift**:
+Eine Fahrt jenseits der Haftgrenze mit ausbrechendem Heck, die der Fahrer mit Gegenlenken und Gas absichtlich hält.
+_Avoid_: Schleudern, Slide
+
+**Rutschen**:
+Eine Fahrt jenseits der Haftgrenze, die niemand absichtlich hält. Daraus wird ein Drift oder ein Dreher, oder das Auto fängt sich.
+_Avoid_: Schleudern, Wegschmieren
+
+**Dreher**:
+Das Heck überholt die Front, und das Auto dreht sich um die eigene Hochachse, ohne dass der Fahrer es noch abfangen kann.
+_Avoid_: Spin, Turbulenz
+
+**Driftwinkel**:
+Der Winkel zwischen der Längsachse des Autos und seiner Fahrtrichtung.
+_Avoid_: Schwimmwinkel, Slip-Winkel, Drift-Angle
+
 ## Ausgaben
 
 **Animationsdaten**:

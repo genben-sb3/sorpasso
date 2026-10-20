@@ -10,3 +10,4 @@
 - [ ] Mit Sperrdifferenzial ist der Drehzahlunterschied der Antriebsräder beim Beschleunigen aus der Kurve kleiner als mit offenem.
 - [ ] Ein Fronttriebler und ein Allradler fahren an, beschleunigen und bremsen stabil.
 - [ ] Die Fahrzeugdatei lehnt ungültige Kombinationen verständlich ab.
+- [ ] Im Drift hält die Automatik den Gang; durchdrehende Räder lösen kein Hochschalten aus.

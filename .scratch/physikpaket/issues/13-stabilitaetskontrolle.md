@@ -9,3 +9,5 @@
 - [ ] Im Spurwechsel erreicht das Auto mit Stabilitätskontrolle eine höhere Einfahrgeschwindigkeit ohne Dreher als ohne.
 - [ ] Bei ruhiger Geradeausfahrt und stationärer Kreisfahrt fern vom Grenzbereich greift sie nicht ein.
 - [ ] Ausgeschaltet verhält sich das Auto genau wie ohne Stabilitätskontrolle.
+- [ ] Mit Stabilitätskontrolle lässt sich kein Kreisdrift halten.
+- [ ] Ihr Eingriff erzeugt kein neues Pendeln; nach dem Abfangen beruhigt sich das Auto.

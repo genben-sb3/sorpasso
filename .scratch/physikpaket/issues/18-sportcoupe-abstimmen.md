@@ -2,7 +2,7 @@
 
 **What to build:** Die Fahrzeugdatei des Sportcoupés wird mit dem Abstimm-Werkzeug so eingestellt, dass alle Testmanöver ihre Zielwerte in der Toleranz treffen (Startwerte: 0–100 in 5,0 s, Bremsweg 35 m, 1,0 g in der Kreisfahrt, Vmax 265 km/h; Zielwerte dürfen begründet angepasst werden). Danach wird der PP-Wert berechnet und gespeichert.
 
-**Blocked by:** 07, 13, 17
+**Blocked by:** 07, 13, 17, 20
 
 **Status:** ready-for-agent
 
