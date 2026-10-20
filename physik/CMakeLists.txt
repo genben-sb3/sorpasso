@@ -4,6 +4,7 @@ add_library(ultragravity_physik
   src/fahrzeugdatei.cpp
   src/fahrzeugschritt.cpp
   src/pruefsumme.cpp
+  src/telemetrie_csv.cpp
 )
 add_library(ultragravity::physik ALIAS ultragravity_physik)
 

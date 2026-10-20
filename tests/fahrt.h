@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <numbers>
 #include <cstdint>
+#include <numbers>
 #include <optional>
 
 #include "doctest/doctest.h"
@@ -22,6 +22,30 @@ inline Kennwerte sportcoupe() {
     LadeErgebnis ergebnis = lade_fahrzeugdatei(UG_FAHRZEUGE_DIR "/sportcoupe.json");
     REQUIRE_FALSE(ergebnis.fehler.has_value());
     return ergebnis.kennwerte;
+}
+
+inline Kennwerte mit_automatik() {
+    Kennwerte auto_ = sportcoupe();
+    auto_.antrieb.getriebe.modus = Getriebemodus::automatik;
+    auto_.antrieb.getriebe.automatik = {.hochschaltdrehzahl = 6500.0 * u_min,
+                                        .runterschaltdrehzahl = 2500.0 * u_min,
+                                        .bremsschaltdrehzahl = 4000.0 * u_min,
+                                        .haltezeit = 0.8,
+                                        .einkuppelbereich = 1500.0 * u_min,
+                                        .einkuppelzeit = 0.15,
+                                        .driftwinkel = 10.0 * std::numbers::pi / 180.0};
+    return auto_;
+}
+
+inline int gang(const Testwelt& welt) { return welt.letzter_schritt().zustand.gang; }
+
+inline EingabePaket fahren(double gas, double bremse = 0.0, double lenkung = 0.0) {
+    EingabePaket p;
+    p.gangwunsch = 1; // in der Automatik: Fahren
+    p.gas = gas;
+    p.bremse = bremse;
+    p.lenkung = lenkung;
+    return p;
 }
 
 // Liefert für jeden Tick der Fahrt ein Eingabe-Paket mit laufender Tick-Nummer.

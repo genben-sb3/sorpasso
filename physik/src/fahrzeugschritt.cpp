@@ -26,6 +26,25 @@ std::array<Radaufhaengung, anzahl_raeder> radaufhaengungen(const Kennwerte& k) {
     }};
 }
 
+// Dichte der Luft, aus der Luftwiderstand und Abtrieb ihre Kraft ziehen.
+constexpr double luftdichte = 1.2; // kg/m³
+
+// Luft: Der Widerstand wirkt gegen die Fahrtrichtung im Schwerpunkt, der
+// Abtrieb je Achse senkrecht zur Karosserie nach unten an der Achsposition.
+void luftkraefte(const Kennwerte& kennwerte, const Karosseriebewegung& karosserie, const Vec3& vorn, Kraefte& kraefte) {
+    const double staudruck_faktor = 0.5 * luftdichte; // kg/m³
+    kraefte.kraft +=
+        karosserie.geschwindigkeit * (-staudruck_faktor * kennwerte.aero.luftwiderstand * betrag(karosserie.geschwindigkeit));
+    const double fahrtwind = std::max(skalar(karosserie.geschwindigkeit, vorn), 0.0); // m/s
+    for (const Achse* achse : {&kennwerte.vorn, &kennwerte.hinten}) {
+        const Vec3 abtrieb = drehe(karosserie.ausrichtung, {0.0, 0.0, -1.0}) *
+                             (staudruck_faktor * achse->abtrieb * fahrtwind * fahrtwind); // N
+        const Vec3 hebel = drehe(karosserie.ausrichtung, Vec3{achse->x, 0.0, 0.0} - kennwerte.schwerpunkt);
+        kraefte.kraft += abtrieb;
+        kraefte.moment += kreuz(hebel, abtrieb);
+    }
+}
+
 bool vorderrad(int rad) { return rad < hinten_links; }
 
 // Das andere Rad derselben Achse.
@@ -64,6 +83,10 @@ constexpr double schlupfnenner_minimum = 1.0; // m/s
 constexpr double relaxation_minimum = 1.0; // m/s
 
 double schlupfnenner(double v) { return std::sqrt(v * v + schlupfnenner_minimum * schlupfnenner_minimum); }
+
+// Längsschlupf eines Rads mit Drehzahl omega (rad/s) und Radradius r (m) bei der
+// Längsgeschwindigkeit v (m/s) im Kontaktpunkt. Einheitenlos.
+double laengsschlupf(double omega, double r, double v) { return (omega * r - v) / schlupfnenner(v); }
 
 // Gewichtungsfunktion für kombinierten Schlupf: 1 ohne den anderen Schlupf,
 // fällt mit ihm gegen null.
@@ -149,6 +172,7 @@ struct Reifenkraft {
     double quer = 0.0;       // N
     double steigung = 0.0;   // N·s/rad, Ableitung der Längskraft nach der Raddrehzahl
     double grenze = 0.0;     // N, was der Schräglauf an Längskraft übrig lässt
+    double schlupf = 0.0;    // 1, Längsschlupf
 };
 
 // Reifenkräfte eines Rads mit Kontakt bei der Geschwindigkeit v im Kontaktpunkt.
@@ -165,9 +189,10 @@ Reifenkraft reifenkraft(const Radlage& rad, Vec3 v, double omega, double h, doub
     const double weg = std::max(std::hypot(vx, vy), relaxation_minimum) * h; // m
     schraeglauf += (kinematisch - schraeglauf) * (1.0 - std::exp(-weg / reifen.relaxationslaenge));
 
-    const double schlupf = (omega * r - vx) / nenner; // 1
+    const double schlupf = laengsschlupf(omega, r, vx); // 1
     const Kurvenpunkt kurve = magic_formula(reifen.laengs, schlupf);
     Reifenkraft k;
+    k.schlupf = schlupf;
     k.grenze = rad.haftkraft * gewichtung(reifen.kombiniert.laengs, schraeglauf);
     k.laengs = k.grenze * kurve.wert;
     k.steigung = k.grenze * std::max(kurve.steigung, 0.0) * r / nenner;
@@ -276,6 +301,34 @@ int automatikgang(const Zustand& zustand, const Kennwerte& k, double bremse, Vec
     return gang;
 }
 
+// Traktionskontrolle: Sie nimmt dem Fahrer Gas weg, solange der Schlupf der
+// Antriebsräder über dem Ziel der Stufe liegt, und gibt es erst wieder, wenn er
+// deutlich darunter liegt. Dazwischen hält sie den Faktor (Hysterese), damit sie
+// nicht an- und ausschaltet. Stufe 0 greift nie ein.
+constexpr double tk_ziel_stufe0 = 0.30;       // 1, Ziel-Schlupf, von dem aus die Stufen abziehen
+constexpr int    tk_max_stufe = 5;            // höchste Stufe, größere werden begrenzt
+constexpr double tk_ziel_minimum = 0.01;      // 1, Untergrenze des Ziel-Schlupfs
+constexpr double tk_ziel_je_stufe = 0.05;     // 1, weniger Ziel-Schlupf je Stufe
+constexpr double tk_untere_schwelle = 0.8;    // 1, Anteil des Ziels, unter dem das Gas zurückkommt
+constexpr double tk_abregeln = 2.0;           // 1/s, Gasfaktor, der je Sekunde wegfällt
+constexpr double tk_aufregeln = 0.5;          // 1/s, Gasfaktor, der je Sekunde zurückkommt
+
+double traktionsfaktor(double faktor, int stufe, const Antriebsachsen& angetrieben,
+                       const std::array<double, anzahl_raeder>& raddrehzahl, double v_laengs, double dt) {
+    if (stufe <= 0) return 1.0;
+    const double ziel = std::max(tk_ziel_stufe0 - tk_ziel_je_stufe * std::min(stufe, tk_max_stufe), tk_ziel_minimum); // 1
+    double schlupf = 0.0; // 1, größter Antriebsschlupf
+    for (int i = 0; i < angetrieben.anzahl; ++i) {
+        const Antriebsachse& a = angetrieben.achsen[i];
+        for (int rad : {a.links, a.rechts}) {
+            schlupf = std::max(schlupf, laengsschlupf(raddrehzahl[rad], a.achse->radradius, v_laengs));
+        }
+    }
+    if (schlupf > ziel) return std::max(faktor - tk_abregeln * dt, 0.0);
+    if (schlupf < tk_untere_schwelle * ziel) return std::min(faktor + tk_aufregeln * dt, 1.0);
+    return faktor;
+}
+
 } // namespace
 
 Zustand rollender_zustand(const Kennwerte& kennwerte, double geschwindigkeit) {
@@ -361,19 +414,7 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
         ergebnis.telemetrie.radlast[i] = radlast;
     }
 
-    // Luft: Der Widerstand wirkt gegen die Fahrtrichtung im Schwerpunkt, der
-    // Abtrieb je Achse senkrecht zur Karosserie nach unten an der Achsposition.
-    const double staudruck_faktor = 0.5 * luftdichte; // kg/m³
-    ergebnis.kraefte.kraft +=
-        karosserie.geschwindigkeit * (-staudruck_faktor * kennwerte.aero.luftwiderstand * betrag(karosserie.geschwindigkeit));
-    const double fahrtwind = std::max(skalar(karosserie.geschwindigkeit, vorn), 0.0); // m/s
-    for (const Achse* achse : {&kennwerte.vorn, &kennwerte.hinten}) {
-        const Vec3 abtrieb = drehe(karosserie.ausrichtung, {0.0, 0.0, -1.0}) *
-                             (staudruck_faktor * achse->abtrieb * fahrtwind * fahrtwind); // N
-        const Vec3 hebel = drehe(karosserie.ausrichtung, Vec3{achse->x, 0.0, 0.0} - kennwerte.schwerpunkt);
-        ergebnis.kraefte.kraft += abtrieb;
-        ergebnis.kraefte.moment += kreuz(hebel, abtrieb);
-    }
+    luftkraefte(kennwerte, karosserie, vorn, ergebnis.kraefte);
 
     // Räder und Reifen in Zwischenschritten. Radlast, Kontaktpunkt und Drehung der
     // Karosserie bleiben dabei fest. Bewusste Näherung: Nur die Geschwindigkeit der
@@ -404,6 +445,9 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     }
     const double uebersetzung = gesamtuebersetzung(antrieb, ergebnis.zustand.gang);
     double& motordrehzahl = ergebnis.zustand.motordrehzahl;
+    ergebnis.zustand.traktionsfaktor =
+        traktionsfaktor(zustand.traktionsfaktor, eingabe.fahrhilfen.traktionskontrolle, angetrieben,
+                        zustand.raddrehzahl, skalar(karosserie.geschwindigkeit, vorn), dt);
     // Die Automatik kuppelt selbst: mit der Motordrehzahl über Leerlauf ein und
     // nach dem Schalten innerhalb der Einkuppelzeit wieder.
     const Automatik& au = antrieb.getriebe.automatik;
@@ -421,7 +465,8 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     Vec3 dv_karosserie; // m/s
     for (int schritt = 0; schritt < zwischenschritte; ++schritt) {
         // Beim automatischen Schalten nimmt die Automatik das Gas weg.
-        const double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
+        double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
+        gas *= ergebnis.zustand.traktionsfaktor;
         motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, gas) / antrieb.motor.traegheit;
         motordrehzahl = std::max(motordrehzahl, 0.0);
         for (int i = 0; i < anzahl_raeder; ++i) ergebnis.zustand.raddrehwinkel[i] += h * ergebnis.zustand.raddrehzahl[i];
@@ -445,6 +490,9 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
             if (!rad.kontakt) continue;
             const Vec3 kraft = rad.laengs * fx + rad.quer * k.quer; // N
             reifenkraft_gesamt += kraft;
+            ergebnis.telemetrie.schlupf[i] += k.schlupf * gewicht_zwischenschritt;
+            ergebnis.telemetrie.kraft_laengs[i] += fx * gewicht_zwischenschritt;
+            ergebnis.telemetrie.kraft_quer[i] += k.quer * gewicht_zwischenschritt;
             ergebnis.kraefte.kraft += kraft * gewicht_zwischenschritt;
             ergebnis.kraefte.moment += kreuz(rad.hebel, kraft) * gewicht_zwischenschritt;
         }
@@ -507,6 +555,8 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
     anim.wanken = std::asin(std::clamp(drehe(karosserie.ausrichtung, {0.0, 1.0, 0.0}).z, -1.0, 1.0));
     anim.lenkrad = std::clamp(eingabe.lenkung, -1.0, 1.0) * lenkrad_ausschlag;
     anim.drehzahl = ergebnis.zustand.motordrehzahl;
+    ergebnis.telemetrie.schraeglauf = ergebnis.zustand.schraeglauf;
+    ergebnis.telemetrie.geschwindigkeit = skalar(karosserie.geschwindigkeit, vorn);
     return ergebnis;
 }
 
