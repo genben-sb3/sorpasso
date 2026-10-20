@@ -364,7 +364,7 @@ void pruefe_getriebe(Plausibilitaet& p, const Getriebe& g, const std::string& pf
 // Aufeinanderfolgende Gänge: kleinstes Verhältnis der Übersetzung eines Gangs
 // zu der seines Vorgängers, also der größte Drehzahlsprung beim Hochschalten.
 double groesster_sprung(const Getriebe& g) {
-    double sprung = 1.0;
+    double sprung = 1.0; // 1
     for (std::size_t i = 1; i < g.uebersetzungen.size(); ++i) {
         sprung = std::min(sprung, g.uebersetzungen[i] / g.uebersetzungen[i - 1]);
     }
@@ -379,10 +379,11 @@ void pruefe_automatik(Plausibilitaet& p, const Antrieb& a, const std::string& pf
     p.positiv(m.runterschaltdrehzahl, unter(pfad, "runterschalt_u_min"));
     // Nach dem Hochschalten muss die Drehzahl über der Runterschaltschwelle bleiben,
     // sonst schaltet die Automatik sofort wieder zurück und pendelt.
-    if (!(m.runterschaltdrehzahl < m.hochschaltdrehzahl * groesster_sprung(a.getriebe))) {
+    const double drehzahl_nach_hochschalten = m.hochschaltdrehzahl * groesster_sprung(a.getriebe); // rad/s
+    if (!(m.runterschaltdrehzahl < drehzahl_nach_hochschalten)) {
         p.melde(unter(pfad, "runterschalt_u_min"),
                 "muss unter der Drehzahl liegen, auf die das Hochschalten fällt (" +
-                    zahl_als_text(m.hochschaltdrehzahl * groesster_sprung(a.getriebe) / u_min) +
+                    zahl_als_text(drehzahl_nach_hochschalten / u_min) +
                     "), sonst pendelt die Automatik");
     }
     if (!(m.bremsschaltdrehzahl >= m.runterschaltdrehzahl && m.bremsschaltdrehzahl < m.hochschaltdrehzahl)) {
