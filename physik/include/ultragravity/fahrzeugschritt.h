@@ -53,6 +53,7 @@ struct Zustand {
     int gang = 0;                                    // 0 Leerlauf, 1 … n Vorwärtsgänge
     double schaltrest = 0.0;                         // s, bis der Gang greift
     double gangalter = 1000.0;                       // s seit dem letzten Gangwechsel
+    double traktionsfaktor = 1.0;                    // 1, Anteil des Gaspedals, den die Traktionskontrolle durchlässt
 };
 
 
