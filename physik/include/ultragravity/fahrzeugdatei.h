@@ -84,14 +84,44 @@ struct Kupplung {
     double moment = 0.0; // N·m, das sie eingekuppelt höchstens überträgt
 };
 
+enum class Getriebemodus { manuell, automatik };
+
+// Schaltpunkte der Automatik. Sie rechnet mit der Motordrehzahl, die zur
+// Geschwindigkeit über Grund gehört, nicht mit der gemessenen: Durchdrehende
+// Räder treiben den Motor nicht in den nächsten Gang.
+struct Automatik {
+    double hochschaltdrehzahl = 0.0;      // rad/s, darüber schaltet sie hoch
+    double runterschaltdrehzahl = 0.0;    // rad/s, darunter schaltet sie ohne Bremse herunter
+    double bremsschaltdrehzahl = 0.0;     // rad/s, darunter schaltet sie bei Bremse herunter
+    double haltezeit = 0.0;               // s, die ein Gang mindestens gehalten wird
+    double einkuppelbereich = 0.0;        // rad/s über Leerlauf, bis die Kupplung voll greift
+    double einkuppelzeit = 0.0;           // s, in denen die Kupplung nach dem Schalten wieder greift
+    double driftwinkel = 0.0;             // rad, ab dem sie den Gang hält
+};
+
 struct Getriebe {
     std::vector<double> uebersetzungen; // 1, vom ersten Gang an absteigend
     double achsuebersetzung = 0.0;      // 1
     double schaltzeit = 0.0;            // s ohne Kraftschluss je Gangwechsel
+    Getriebemodus modus = Getriebemodus::manuell;
+    Automatik automatik;                // nur bei Modus automatik gelesen
 };
 
-// Heckantrieb mit offenem Differenzial.
+enum class Antriebsart { heck, front, allrad };
+
+// Lamellen-Sperrdifferenzial: Die Sperrwirkung hält die Räder einer Achse
+// zusammen, bis das Sperrmoment ausgeschöpft ist. Es wächst mit dem
+// Antriebsmoment der Achse.
+struct Differenzial {
+    bool sperrt = false;       // false: offenes Differenzial
+    double vorspannung = 0.0;  // N·m Sperrmoment ohne Last
+    double sperrwirkung = 0.0; // 1, zusätzliches Sperrmoment je Antriebsmoment der Achse
+};
+
 struct Antrieb {
+    Antriebsart art = Antriebsart::heck;
+    Differenzial differenzial;        // an jeder angetriebenen Achse
+    double momentverteilung_vorn = 0.0; // 1, Anteil der Vorderachse am Antriebsmoment, nur beim Allrad
     Motor motor;
     Kupplung kupplung;
     Getriebe getriebe;

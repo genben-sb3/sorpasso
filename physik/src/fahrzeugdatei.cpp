@@ -185,6 +185,52 @@ Antrieb lies_antrieb(Leser& leser, const json& wurzel) {
     }
     a.getriebe.achsuebersetzung = leser.zahl(g, getriebe, "achsuebersetzung");
     a.getriebe.schaltzeit = leser.zahl(g, getriebe, "schaltzeit");
+
+    // Optionale Blöcke liest er nur, wenn die Wahl sie verlangt; liegt einer ohne
+    // diese Wahl in der Datei, fällt das in der Plausibilitätsprüfung auf.
+    const std::string modus = leser.text(g, getriebe, "modus");
+    if (modus == "manuell") {
+        a.getriebe.modus = Getriebemodus::manuell;
+    } else if (modus == "automatik") {
+        a.getriebe.modus = Getriebemodus::automatik;
+        const std::string pfad = unter(getriebe, "automatik");
+        const json& au = leser.objekt(g, getriebe, "automatik");
+        Automatik& m = a.getriebe.automatik;
+        m.hochschaltdrehzahl = leser.zahl(au, pfad, "hochschalt_u_min") * u_min;
+        m.runterschaltdrehzahl = leser.zahl(au, pfad, "runterschalt_u_min") * u_min;
+        m.bremsschaltdrehzahl = leser.zahl(au, pfad, "bremsschalt_u_min") * u_min;
+        m.haltezeit = leser.zahl(au, pfad, "haltezeit");
+        m.einkuppelbereich = leser.zahl(au, pfad, "einkuppelbereich_u_min") * u_min;
+        m.einkuppelzeit = leser.zahl(au, pfad, "einkuppelzeit");
+        m.driftwinkel = leser.zahl(au, pfad, "driftwinkel_grad") * grad;
+    } else if (!leser.fehler) {
+        leser.melde(unter(getriebe, "modus"), "muss \"manuell\" oder \"automatik\" sein");
+    }
+
+    const std::string art = leser.text(o, "antrieb", "art");
+    if (art == "heck") {
+        a.art = Antriebsart::heck;
+    } else if (art == "front") {
+        a.art = Antriebsart::front;
+    } else if (art == "allrad") {
+        a.art = Antriebsart::allrad;
+        a.momentverteilung_vorn = leser.zahl(o, "antrieb", "momentverteilung_vorn");
+    } else if (!leser.fehler) {
+        leser.melde("antrieb.art", "muss \"heck\", \"front\" oder \"allrad\" sein");
+    }
+
+    const std::string differenzial = "antrieb.differenzial";
+    const json& d = leser.objekt(o, "antrieb", "differenzial");
+    const std::string sperre = leser.text(d, differenzial, "art");
+    if (sperre == "offen") {
+        a.differenzial.sperrt = false;
+    } else if (sperre == "sperre") {
+        a.differenzial.sperrt = true;
+        a.differenzial.vorspannung = leser.zahl(d, differenzial, "vorspannung");
+        a.differenzial.sperrwirkung = leser.zahl(d, differenzial, "sperrwirkung");
+    } else if (!leser.fehler) {
+        leser.melde(unter(differenzial, "art"), "muss \"offen\" oder \"sperre\" sein");
+    }
     return a;
 }
 
@@ -315,6 +361,57 @@ void pruefe_getriebe(Plausibilitaet& p, const Getriebe& g, const std::string& pf
     p.nicht_negativ(g.schaltzeit, unter(pfad, "schaltzeit"));
 }
 
+// Aufeinanderfolgende Gänge: kleinstes Verhältnis der Übersetzung eines Gangs
+// zu der seines Vorgängers, also der größte Drehzahlsprung beim Hochschalten.
+double groesster_sprung(const Getriebe& g) {
+    double sprung = 1.0;
+    for (std::size_t i = 1; i < g.uebersetzungen.size(); ++i) {
+        sprung = std::min(sprung, g.uebersetzungen[i] / g.uebersetzungen[i - 1]);
+    }
+    return sprung;
+}
+
+void pruefe_automatik(Plausibilitaet& p, const Antrieb& a, const std::string& pfad) {
+    const Automatik& m = a.getriebe.automatik;
+    const Motor& motor = a.motor;
+    p.zwischen(m.hochschaltdrehzahl / u_min, {motor.leerlaufdrehzahl / u_min, "Leerlaufdrehzahl"},
+               {motor.hoechstdrehzahl / u_min, "Höchstdrehzahl"}, unter(pfad, "hochschalt_u_min"));
+    p.positiv(m.runterschaltdrehzahl, unter(pfad, "runterschalt_u_min"));
+    // Nach dem Hochschalten muss die Drehzahl über der Runterschaltschwelle bleiben,
+    // sonst schaltet die Automatik sofort wieder zurück und pendelt.
+    if (!(m.runterschaltdrehzahl < m.hochschaltdrehzahl * groesster_sprung(a.getriebe))) {
+        p.melde(unter(pfad, "runterschalt_u_min"),
+                "muss unter der Drehzahl liegen, auf die das Hochschalten fällt (" +
+                    zahl_als_text(m.hochschaltdrehzahl * groesster_sprung(a.getriebe) / u_min) +
+                    "), sonst pendelt die Automatik");
+    }
+    if (!(m.bremsschaltdrehzahl >= m.runterschaltdrehzahl && m.bremsschaltdrehzahl < m.hochschaltdrehzahl)) {
+        p.melde(unter(pfad, "bremsschalt_u_min"),
+                "muss zwischen runterschalt_u_min und hochschalt_u_min liegen");
+    }
+    p.positiv(m.haltezeit, unter(pfad, "haltezeit"));
+    p.positiv(m.einkuppelbereich, unter(pfad, "einkuppelbereich_u_min"));
+    p.nicht_negativ(m.einkuppelzeit, unter(pfad, "einkuppelzeit"));
+    p.positiv(m.driftwinkel, unter(pfad, "driftwinkel_grad"));
+    p.hoechstens(m.driftwinkel / grad, 90.0, unter(pfad, "driftwinkel_grad"));
+}
+
+void pruefe_antriebsart(Plausibilitaet& p, const Antrieb& a) {
+    if (a.art == Antriebsart::allrad) {
+        p.zwischen(a.momentverteilung_vorn, {0.0, "keinem Moment vorn"}, {1.0, "keinem Moment hinten"},
+                   "antrieb.momentverteilung_vorn");
+    }
+    if (a.differenzial.sperrt) {
+        p.nicht_negativ(a.differenzial.vorspannung, "antrieb.differenzial.vorspannung");
+        p.nicht_negativ(a.differenzial.sperrwirkung, "antrieb.differenzial.sperrwirkung");
+        if (!(a.differenzial.vorspannung > 0.0 || a.differenzial.sperrwirkung > 0.0)) {
+            p.melde("antrieb.differenzial.art",
+                    "ein Sperrdifferenzial braucht Vorspannung oder Sperrwirkung, sonst ist es offen");
+        }
+    }
+    if (a.getriebe.modus == Getriebemodus::automatik) pruefe_automatik(p, a, "antrieb.getriebe.automatik");
+}
+
 std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     Plausibilitaet p;
     p.positiv(k.masse, "masse");
@@ -340,7 +437,28 @@ std::optional<LadeFehler> pruefe(const Kennwerte& k) {
     pruefe_motor(p, k.antrieb.motor, "antrieb.motor");
     p.positiv(k.antrieb.kupplung.moment, "antrieb.kupplung.moment");
     pruefe_getriebe(p, k.antrieb.getriebe, "antrieb.getriebe");
+    pruefe_antriebsart(p, k.antrieb);
     return p.fehler;
+}
+
+// Blöcke, die zur gewählten Antriebsart, zum Differenzial oder zum Getriebemodus
+// nicht passen, lehnt er ab, statt sie still zu übergehen.
+std::optional<LadeFehler> fremde_bloecke(const json& antrieb) {
+    const auto text = [](const json& o, const char* name) { return o.at(name).get<std::string>(); };
+    if (antrieb.contains("momentverteilung_vorn") && text(antrieb, "art") != "allrad") {
+        return LadeFehler{"antrieb.momentverteilung_vorn", "gibt es nur beim Allradantrieb"};
+    }
+    const json& differenzial = antrieb.at("differenzial");
+    for (const char* name : {"vorspannung", "sperrwirkung"}) {
+        if (differenzial.contains(name) && text(differenzial, "art") != "sperre") {
+            return LadeFehler{unter("antrieb.differenzial", name), "gibt es nur beim Sperrdifferenzial"};
+        }
+    }
+    const json& getriebe = antrieb.at("getriebe");
+    if (getriebe.contains("automatik") && text(getriebe, "modus") != "automatik") {
+        return LadeFehler{"antrieb.getriebe.automatik", "gibt es nur im Getriebemodus automatik"};
+    }
+    return std::nullopt;
 }
 
 // Prüft nur die JSON-Syntax und merkt sich, wo sie bricht. Der DOM-Parser
@@ -410,6 +528,7 @@ LadeErgebnis lies_fahrzeugdatei(std::string_view text) {
     k.antrieb = lies_antrieb(leser, wurzel);
 
     if (leser.fehler) return {{}, leser.fehler};
+    if (auto verstoss = fremde_bloecke(wurzel.at("antrieb"))) return {{}, std::move(verstoss)};
     if (auto verstoss = pruefe(k)) return {{}, std::move(verstoss)};
     return {std::move(k), std::nullopt};
 }

@@ -30,6 +30,14 @@ _Avoid_: Input, Controls, Kommando
 Alle Kennwerte eines Autos (Masse, Geometrie, Reifen, Fahrwerk, Antrieb, Aero), getrennt vom Code. Ein Auto ist genau eine Fahrzeugdatei.
 _Avoid_: Config, Preset, Setup
 
+**Sperrdifferenzial**:
+Lamellen-Differenzial einer angetriebenen Achse mit Vorspannung und lastabhängiger Sperrwirkung. Ohne Sperre heißt es offenes Differenzial.
+_Avoid_: Torsen, Limited Slip
+
+**Automatik**:
+Getriebemodus, in dem das Auto selbst kuppelt und schaltet. Sie rechnet mit der Drehzahl, die zur Geschwindigkeit über Grund gehört, und hält im Drift den Gang.
+_Avoid_: Automatikgetriebe
+
 **Abstimm-Werkzeug**:
 Fährt Testmanöver mit einem Auto und vergleicht die Ergebnisse mit dessen Zielwerten.
 _Avoid_: Tuner, Optimizer

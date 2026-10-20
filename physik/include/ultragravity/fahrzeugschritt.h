@@ -55,6 +55,7 @@ struct Zustand {
     double motordrehzahl = 0.0;                      // rad/s
     int gang = 0;                                    // 0 Leerlauf, 1 … n Vorwärtsgänge
     double schaltrest = 0.0;                         // s, bis der Gang greift
+    double gangalter = 1000.0;                       // s seit dem letzten Gangwechsel
 };
 
 

@@ -179,6 +179,8 @@ TEST_CASE("Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft
     kennwerte.aero.luftwiderstand = 1e-9;
     kennwerte.vorn.abtrieb = 0.0;
     kennwerte.hinten.abtrieb = 0.0;
+    // Ein Sperrdifferenzial würde das Rad in der Luft über die Vorspannung mitziehen.
+    kennwerte.antrieb.differenzial = {};
     Karosseriebewegung karosserie;
     karosserie.position = {0.0, 0.0, 0.5};
     karosserie.geschwindigkeit = {20.0, 3.0, 0.0};

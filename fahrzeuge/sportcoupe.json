@@ -80,6 +80,8 @@
     "balance": 0.65
   },
   "antrieb": {
+    "art": "heck",
+    "differenzial": { "art": "sperre", "vorspannung": 80.0, "sperrwirkung": 0.4 },
     "motor": {
       "drehmoment": [
         { "u_min": 1000.0, "moment": 250.0 },
@@ -102,7 +104,8 @@
     "getriebe": {
       "uebersetzungen": [3.2, 2.2, 1.6, 1.25, 1.0, 0.82],
       "achsuebersetzung": 3.6,
-      "schaltzeit": 0.25
+      "schaltzeit": 0.25,
+      "modus": "manuell"
     }
   }
 }
