@@ -52,6 +52,9 @@ double stabilisatorlast(const Fahrwerk& f, double einfederung, double einfederun
 // Zwischenschritte für Räder und Reifen je Fahrzeug-Schritt (ADR-0006).
 constexpr int zwischenschritte = 8;
 
+// Drehung des Lenkrads bei vollem Ausschlag, je Seite (450°).
+constexpr double lenkrad_ausschlag = 2.5 * std::numbers::pi; // rad
+
 constexpr double schlupfnenner_minimum = 1.0; // m/s
 
 // Untergrenze der Radgeschwindigkeit für die Relaxation. Ohne sie fröre der
@@ -383,6 +386,7 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
         const double gas = automatik && ergebnis.zustand.schaltrest > 0.0 ? 0.0 : eingabe.gas;
         motordrehzahl += h * motormoment(antrieb.motor, motordrehzahl, gas) / antrieb.motor.traegheit;
         motordrehzahl = std::max(motordrehzahl, 0.0);
+        for (int i = 0; i < anzahl_raeder; ++i) ergebnis.zustand.raddrehwinkel[i] += h * ergebnis.zustand.raddrehzahl[i];
 
         Vec3 reifenkraft_gesamt; // N
         std::array<double, anzahl_raeder> drehzahl_frei{}; // rad/s nach Reifen und Antrieb, vor der Bremse
@@ -463,7 +467,18 @@ SchrittErgebnis fahrzeugschritt(const Zustand& zustand, const Kennwerte& kennwer
                 std::abs(frei) <= bremsimpuls ? 0.0 : frei - std::copysign(bremsimpuls, frei);
         }
     }
-    ergebnis.animationsdaten.drehzahl = ergebnis.zustand.motordrehzahl;
+    Animationsdaten& anim = ergebnis.animationsdaten;
+    for (int i = 0; i < anzahl_raeder; ++i) {
+        ergebnis.zustand.raddrehwinkel[i] = wickle_winkel(ergebnis.zustand.raddrehwinkel[i]);
+        anim.raddrehwinkel[i] = ergebnis.zustand.raddrehwinkel[i];
+        anim.lenkwinkel[i] = vorderrad(i) ? lenkwinkel_vorn : 0.0;
+    }
+    // Aus der Ausrichtung der Karosserie: Nicken aus der Neigung der Längsachse,
+    // Wanken aus der Neigung der Querachse.
+    anim.nicken = std::asin(std::clamp(-vorn.z, -1.0, 1.0));
+    anim.wanken = std::asin(std::clamp(drehe(karosserie.ausrichtung, {0.0, 1.0, 0.0}).z, -1.0, 1.0));
+    anim.lenkrad = std::clamp(eingabe.lenkung, -1.0, 1.0) * lenkrad_ausschlag;
+    anim.drehzahl = ergebnis.zustand.motordrehzahl;
     return ergebnis;
 }
 
