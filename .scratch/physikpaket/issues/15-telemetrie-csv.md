@@ -4,8 +4,7 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Die CSV hat eine Kopfzeile mit Einheiten und genau eine Zeile pro Tick.
 - [ ] Die Werte einer Zeile stimmen mit dem Zustand des jeweiligen Ticks überein.
 - [ ] Die Telemetrie verändert die Fahrt nicht (gleiche Prüfsumme mit und ohne).

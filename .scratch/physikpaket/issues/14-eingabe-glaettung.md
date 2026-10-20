@@ -4,8 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Ein voller Tastendruck baut die Lenkung über die eingestellte Zeit auf; Loslassen stellt schneller zurück.
 - [ ] Gas und Bremse steigen bei digitaler Eingabe weich an.
 - [ ] Bei hoher Geschwindigkeit ist der wirksame Lenkausschlag begrenzt; ein voller Tastendruck lenkt nicht über den Grip hinaus (in der Testwelt prüfbar).

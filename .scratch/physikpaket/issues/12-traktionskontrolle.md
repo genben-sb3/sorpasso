@@ -4,8 +4,7 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Bei Vollgas aus dem Stand ist der Schlupf der Antriebsräder umso kleiner, je höher die Stufe.
 - [ ] Stufe 0 verhält sich genau wie ohne Traktionskontrolle.
 - [ ] Die Regelung pendelt nicht (kein ständiges An und Aus).

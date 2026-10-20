@@ -4,8 +4,7 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Mit Automatik schaltet das Auto bei Vollgas selbstständig hoch und beim Bremsen herunter, ohne Pendeln zwischen zwei Gängen.
 - [ ] Mit Sperrdifferenzial ist der Drehzahlunterschied der Antriebsräder beim Beschleunigen aus der Kurve kleiner als mit offenem.
 - [ ] Ein Fronttriebler und ein Allradler fahren an, beschleunigen und bremsen stabil.

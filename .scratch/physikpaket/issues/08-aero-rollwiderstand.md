@@ -4,8 +4,7 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Die Höchstgeschwindigkeit liegt dort, wo Antriebskraft und Fahrwiderstände im Gleichgewicht sind (Toleranz).
 - [ ] Ohne Gas und Bremse rollt das Auto plausibel aus.
 - [ ] Abtrieb erhöht mit steigender Geschwindigkeit die Radlast an der jeweiligen Achse.

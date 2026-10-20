@@ -4,8 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
-
+**Status:** done
 - [ ] Die Animationsdaten passen zum Zustand (zum Beispiel Federweg und Nicken beim Bremsen, Lenkwinkel bei Lenkung).
 - [ ] Die Interpolation liefert bei Anteil 0 und 1 genau die beiden Ticks und dazwischen stetige Werte; Raddrehwinkel springen nicht beim Überlauf.
 - [ ] Ohne Bodenkontakt eines Rads entsteht an diesem Rad keine Reifenkraft.
