@@ -103,6 +103,7 @@
     },
     "gearbox": {
       "ratios": [3.2, 2.2, 1.6, 1.25, 1.0, 0.82],
+      "reverse_ratio": 3.4,
       "final_drive": 3.6,
       "shift_time": 0.25,
       "mode": "manual"

@@ -237,6 +237,29 @@ TEST_CASE("An engine without a torque curve and a gearbox without gears are reje
     }
 }
 
+TEST_CASE("The gearbox needs a positive ratio for the reverse gear") {
+    const LoadResult coupe = parse(sports_coupe());
+    REQUIRE_FALSE(coupe.error.has_value());
+    CHECK(coupe.params.drivetrain.gearbox.reverse_ratio == doctest::Approx(3.4));
+
+    nlohmann::json missing = sports_coupe();
+    missing["drivetrain"]["gearbox"].erase("reverse_ratio");
+    const LoadResult without = parse(missing);
+    REQUIRE(without.error.has_value());
+    CHECK(without.error->field == "drivetrain.gearbox.reverse_ratio");
+    CHECK(without.error->message == "is missing");
+
+    for (const double value : {0.0, -3.4}) {
+        CAPTURE(value);
+        nlohmann::json j = sports_coupe();
+        j["drivetrain"]["gearbox"]["reverse_ratio"] = value;
+        const LoadResult result = parse(j);
+        REQUIRE(result.error.has_value());
+        CHECK(result.error->field == "drivetrain.gearbox.reverse_ratio");
+        CHECK(result.error->message == "must be greater than 0");
+    }
+}
+
 TEST_CASE("A torque curve point that is not an object is reported with its path") {
     nlohmann::json j = sports_coupe();
     j["drivetrain"]["engine"]["torque_curve"][1] = 42.0;

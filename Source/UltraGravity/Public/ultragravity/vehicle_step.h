@@ -50,7 +50,7 @@ struct State {
     std::array<double, wheel_count> wheel_angle{}; // rad, in [-π, π)
     std::array<double, wheel_count> slip_angle{};  // rad, lagged by the tire over the relaxation length
     double engine_speed = 0.0;                     // rad/s
-    int gear = 0;                                  // 0 neutral, 1 … n forward gears
+    int gear = 0;                                  // -1 reverse, 0 neutral, 1 … n forward gears
     double shift_remaining = 0.0;                  // s until the gear engages
     double gear_age = 1000.0;                      // s since the last gear change
     double traction_factor = 1.0;                  // 1, share of the throttle that traction control lets through

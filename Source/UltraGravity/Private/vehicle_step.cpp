@@ -267,9 +267,16 @@ double equalizing_impulse(double difference, // rad/s
     return std::clamp(difference * inertia, -limit, limit);
 }
 
+// Overall ratio from the engine to the wheels; negative in reverse, so the
+// engine turns the wheels backward.
 double overall_ratio(const Drivetrain& d, int gear) {
-    return gear > 0 ? d.gearbox.ratios[gear - 1] * d.gearbox.final_drive : 0.0;
+    if (gear > 0) return d.gearbox.ratios[gear - 1] * d.gearbox.final_drive;
+    if (gear < 0) return -d.gearbox.reverse_ratio * d.gearbox.final_drive;
+    return 0.0;
 }
+
+// Reverse only engages below this forward speed, never out of forward travel.
+constexpr double reverse_engage_speed = 0.5; // m/s
 
 // The gear the automatic picks next. It works with the engine speed that
 // belongs to the speed over ground: spinning wheels do not push it into the
@@ -279,8 +286,9 @@ int automatic_gear(const State& state, const VehicleParams& k, double brake, Vec
     const Drivetrain& d = k.drivetrain;
     const Automatic& au = d.gearbox.automatic;
     const int gears = static_cast<int>(d.gearbox.ratios.size());
-    const int gear = state.gear == 0 ? 1 : state.gear;
-    if (state.gear == 0) return gear;
+    // From neutral or reverse the automatic pulls away in first gear.
+    if (state.gear <= 0) return 1;
+    const int gear = state.gear;
     if (state.gear_age < au.hold_time) return gear;
 
     constexpr double brake_threshold = 0.05; // 1, brake input from which the automatic counts as braking
@@ -426,18 +434,20 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     const bool automatic = drivetrain.gearbox.mode == GearboxMode::automatic;
     const int gears = static_cast<int>(drivetrain.gearbox.ratios.size());
     result.state.gear_age += dt;
-    int gear_request = std::clamp(static_cast<int>(input.gear_request), 0, gears);
-    if (automatic) {
-        // The automatic only knows neutral (0) and drive (anything above).
-        const Vec3 vehicle_velocity{dot(body.velocity, forward),
-                                    dot(body.velocity, rotate(body.orientation, {0.0, 1.0, 0.0})),
+    const double v_longitudinal = dot(body.velocity, forward); // m/s
+    int gear_request = std::clamp(static_cast<int>(input.gear_request), -1, gears);
+    if (automatic && gear_request > 0) {
+        // The automatic only knows reverse (-1), neutral (0) and drive (anything above);
+        // it picks the forward gear itself and never shifts in reverse.
+        const Vec3 vehicle_velocity{v_longitudinal, dot(body.velocity, rotate(body.orientation, {0.0, 1.0, 0.0})),
                                     0.0};
-        gear_request = input.gear_request > 0
-                           ? automatic_gear(state, params, input.brake, vehicle_velocity, drive_radius(driven))
-                           : 0;
+        gear_request = automatic_gear(state, params, input.brake, vehicle_velocity, drive_radius(driven));
     }
+    // Out of forward travel the reverse gear does not engage; the car stays in neutral
+    // until it has (nearly) stopped.
+    if (gear_request < 0 && state.gear >= 0 && v_longitudinal > reverse_engage_speed) gear_request = 0;
     // Gear change: the requested gear only engages after the shift time, until then
-    // there is no drive. There is no reverse gear yet.
+    // there is no drive.
     if (gear_request != result.state.gear) {
         result.state.gear = gear_request;
         result.state.shift_remaining = drivetrain.gearbox.shift_time;
@@ -447,7 +457,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     double& engine_speed = result.state.engine_speed;
     result.state.traction_factor =
         traction_factor(state.traction_factor, input.driving_aids.traction_control, driven,
-                        state.wheel_speed, dot(body.velocity, forward), dt);
+                        state.wheel_speed, v_longitudinal, dt);
     // The automatic operates the clutch itself: it engages with the engine speed above idle
     // and again within the engage time after a shift.
     const Automatic& au = drivetrain.gearbox.automatic;
@@ -502,7 +512,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         // to the same speed: if its torque suffices it sticks, otherwise it slips.
         result.state.shift_remaining = std::max(result.state.shift_remaining - h, 0.0);
         double drive_impulse = 0.0; // N·m·s at the gearbox input
-        if (ratio > 0.0 && result.state.shift_remaining == 0.0) {
+        if (ratio != 0.0 && result.state.shift_remaining == 0.0) {
             const double clutch_engagement = // 1
                 automatic ? std::clamp((engine_speed - drivetrain.engine.idle_speed) / au.engage_range, 0.0, 1.0) *
                                 after_shift
@@ -522,7 +532,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         if (drivetrain.differential.limited_slip) {
             for (int i = 0; i < driven.count; ++i) {
                 const DrivenAxle& a = driven.axles[i];
-                const double axle_torque = std::abs(drive_impulse) / h * ratio * a.share; // N·m
+                const double axle_torque = std::abs(drive_impulse * ratio) / h * a.share; // N·m
                 const double locking_torque = // N·m
                     drivetrain.differential.preload + drivetrain.differential.locking_factor * axle_torque;
                 const double inertia = a.axle->tire.inertia;  // kg·m²

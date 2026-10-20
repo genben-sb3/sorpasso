@@ -435,3 +435,114 @@ TEST_CASE("Front- and all-wheel drive pull away, accelerate and brake stably") {
         CHECK(std::abs(world.body().position.y) < 0.5);
     }
 }
+
+TEST_CASE("In reverse with throttle the car pulls away backward and its wheels turn backward") {
+    const VehicleParams car = sports_coupe();
+    TestWorld world(car, 0.02);
+    Drive drive(world);
+    drive.run(1.5);
+
+    InputPacket reverse;
+    reverse.gear_request = -1;
+    reverse.clutch = 1.0;
+    drive.run(0.5, reverse);
+    REQUIRE(gear(world) == -1);
+
+    OscillationDetector engine;
+    std::array<OscillationDetector, wheel_count> wheels;
+    double previous_angle = world.last_step().animation.wheel_angle[rear_left]; // rad
+    int backward_ticks = 0;
+    reverse.throttle = 0.3;
+    for (int tick = 0; tick < Drive::ticks(2.5); ++tick) {
+        reverse.clutch = std::max(1.0 - static_cast<double>(tick) / Drive::ticks(0.5), 0.0);
+        drive.one_tick(reverse);
+        engine.add(engine_speed(world));
+        for (int i = 0; i < wheel_count; ++i) wheels[i].add(world.last_step().state.wheel_speed[i]);
+        const double angle = world.last_step().animation.wheel_angle[rear_left]; // rad
+        if (wrap_angle(angle - previous_angle) < 0.0) ++backward_ticks;
+        previous_angle = angle;
+    }
+
+    const double v = forward_speed(world);
+    CAPTURE(v);
+    CHECK(v < -2.0);
+    CHECK(gear(world) == -1);
+    for (int i = 0; i < wheel_count; ++i) CHECK(world.last_step().state.wheel_speed[i] < 0.0);
+    CHECK(backward_ticks > Drive::ticks(1.5)); // the animated wheel turns backward
+    // Pulling away backward without jitter.
+    CHECK(engine.longest_run() < 3);
+    for (const OscillationDetector& wheel : wheels) CHECK(wheel.longest_run() < 3);
+}
+
+TEST_CASE("Reverse only engages near standstill, never out of forward travel") {
+    for (const bool automatic : {false, true}) {
+        CAPTURE(automatic);
+        const VehicleParams car = automatic ? with_automatic() : sports_coupe();
+        TestWorld world(car, 0.02, TestGround{}, 30.0 / 3.6);
+        Drive drive(world);
+        drive.run(0.5);
+
+        // Asking for reverse while rolling forward and braking: the gearbox stays in
+        // neutral until the car has stopped, then reverse engages.
+        InputPacket reverse;
+        reverse.gear_request = -1;
+        reverse.clutch = 1.0;
+        reverse.brake = 0.3;
+        for (int tick = 0; tick < Drive::ticks(6.0); ++tick) {
+            const double v_before = forward_speed(world); // m/s
+            drive.one_tick(reverse);
+            if (v_before > 1.0) REQUIRE(gear(world) == 0);
+        }
+        CHECK(std::abs(forward_speed(world)) < 0.1);
+        CHECK(gear(world) == -1);
+    }
+}
+
+TEST_CASE("The automatic pulls away in reverse and does not shift by itself") {
+    const VehicleParams car = with_automatic();
+    TestWorld world(car, 0.02);
+    Drive drive(world);
+    drive.run(1.5);
+
+    InputPacket reverse;
+    reverse.gear_request = -1;
+    reverse.throttle = 1.0;
+    for (int tick = 0; tick < Drive::ticks(6.0); ++tick) {
+        drive.one_tick(reverse);
+        REQUIRE(gear(world) == -1);
+    }
+    const double v = forward_speed(world);
+    CAPTURE(v);
+    // At full throttle the engine reaches its limiter in reverse; an automatic that
+    // shifted would carry the car further.
+    CHECK(v < -10.0);
+    CHECK(engine_speed(world) > car.drivetrain.gearbox.automatic.upshift_speed);
+
+    // Selecting drive again pulls away forward in first gear once stopped.
+    for (int tick = 0; tick < Drive::ticks(8.0); ++tick) drive.one_tick(drive_input(0.0, 1.0));
+    REQUIRE(std::abs(forward_speed(world)) < 0.1);
+    drive.run(3.0, drive_input(0.5));
+    CHECK(forward_speed(world) > 2.0);
+    CHECK(gear(world) >= 1);
+}
+
+TEST_CASE("Two reverse drives with the same input packets yield the same checksum, and reverse counts in it") {
+    const auto drive_with = [](std::int8_t gear_request, double throttle) {
+        TestWorld world(sports_coupe(), 0.02);
+        Drive drive(world);
+        drive.run(1.0);
+        InputPacket packet;
+        packet.gear_request = gear_request;
+        packet.clutch = 1.0;
+        drive.run(0.5, packet);
+        packet.clutch = 0.0;
+        packet.throttle = throttle;
+        drive.run(1.0, packet);
+        return world.checksum();
+    };
+
+    CHECK(drive_with(-1, 0.3) == drive_with(-1, 0.3));
+    CHECK(drive_with(-1, 0.3) != drive_with(-1, 0.31));
+    // The gear is part of the state: reverse at idle differs from neutral.
+    CHECK(drive_with(-1, 0.0) != drive_with(0, 0.0));
+}

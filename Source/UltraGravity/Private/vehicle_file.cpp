@@ -184,6 +184,7 @@ Drivetrain read_drivetrain(Reader& reader, const json& root) {
     for (std::size_t i = 0; i < gears.size(); ++i) {
         d.gearbox.ratios.push_back(reader.number(gears[i], element(child(gearbox, "ratios"), i)));
     }
+    d.gearbox.reverse_ratio = reader.number(g, gearbox, "reverse_ratio");
     d.gearbox.final_drive = reader.number(g, gearbox, "final_drive");
     d.gearbox.shift_time = reader.number(g, gearbox, "shift_time");
 
@@ -358,6 +359,7 @@ void check_gearbox(Plausibility& p, const Gearbox& g, const std::string& path) {
             p.report(element(gears, i), "must be smaller than in the previous gear");
         }
     }
+    p.positive(g.reverse_ratio, child(path, "reverse_ratio"));
     p.positive(g.final_drive, child(path, "final_drive"));
     p.non_negative(g.shift_time, child(path, "shift_time"));
 }

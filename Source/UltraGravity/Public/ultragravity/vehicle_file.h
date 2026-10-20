@@ -101,6 +101,7 @@ struct Automatic {
 
 struct Gearbox {
     std::vector<double> ratios; // 1, descending from first gear
+    double reverse_ratio = 0.0; // 1, magnitude; the reverse gear turns the wheels backward
     double final_drive = 0.0;   // 1
     double shift_time = 0.0;    // s without drive per gear change
     GearboxMode mode = GearboxMode::manual;
