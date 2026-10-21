@@ -32,15 +32,6 @@ namespace
 	// The wheels hang this far above the ground after a reset and settle onto their springs.
 	constexpr double ResetDropHeight = 0.02; // m
 
-	// Brake to reverse: below this speed the car counts as standing, and after the brake has been held this long there
-	// the automatic engages reverse.
-	constexpr double StandstillSpeed = 0.5; // m/s
-	constexpr float ReverseAfter = 0.4f;    // s
-
-	// A pedal counts as pressed above this, as released below the other.
-	constexpr float PedalPressed = 0.5f;
-	constexpr float PedalReleased = 0.05f;
-
 	// The stand-in steering wheel: a rim with a cross spoke and a lower spoke, so its turn shows (cm, in the column's
 	// axes: Z towards the driver, X up along the wheel when it is straight).
 	constexpr double SteeringWheelDiameter = 36.0; // cm
@@ -206,8 +197,7 @@ void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
 	Chassis->SetMassOverrideInKg(NAME_None, Params.mass, true);
 	Sim->Restart(Chassis, Params);
 	PlaceMeshes(Data);
-	bReverse = false;
-	StandingOnBrake = 0.f;
+	BrakeToReverse.Reset();
 	if (LapTimer)
 	{
 		LapTimer->Discard();
@@ -248,7 +238,7 @@ void AGTOVehiclePawn::PlaceMeshes(const UGTOVehicleDataAsset& Data)
 void AGTOVehiclePawn::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	LastInput = ScriptedInput ? *ScriptedInput : ReadDriverInput(DeltaSeconds);
+	LastInput = ScriptedInput ? *ScriptedInput : BrakeToReverse.Apply(ReadDriverInput(), Sim->GetLatestState().Chassis.GetForwardSpeed(), DeltaSeconds);
 	Sim->QueueInput(LastInput);
 
 	if (LapTimer)
@@ -344,7 +334,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	}
 }
 
-FGTODriverInput AGTOVehiclePawn::ReadDriverInput(float DeltaSeconds)
+FGTODriverInput AGTOVehiclePawn::ReadDriverInput() const
 {
 	FGTODriverInput Driver;
 	const UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent);
@@ -353,29 +343,10 @@ FGTODriverInput AGTOVehiclePawn::ReadDriverInput(float DeltaSeconds)
 		return Driver; // not driven by a player
 	}
 	const auto Value = [Input](const UInputAction* Action) { return Input->GetBoundActionValue(Action).Get<float>(); };
-	const float Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
-	const float Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
-
-	// Brake to reverse, as in most racing games with an automatic: holding the brake at a standstill engages reverse,
-	// pressing the throttle at a standstill engages drive again.
-	const FGTOChassisKinematics Motion = Sim->GetLatestState().Chassis;
-	const double ForwardSpeed = Motion.Orientation.UnrotateVector(Motion.LinearVelocity).X; // m/s
-	const bool bStanding = FMath::Abs(ForwardSpeed) < StandstillSpeed;
-	StandingOnBrake = bStanding && Brake > PedalPressed && Throttle < PedalReleased ? StandingOnBrake + DeltaSeconds : 0.f;
-	if (!bReverse && StandingOnBrake >= ReverseAfter)
-	{
-		bReverse = true;
-	}
-	else if (bReverse && bStanding && Throttle > PedalPressed && Brake < PedalReleased)
-	{
-		bReverse = false;
-	}
-
 	Driver.Steer = FMath::Clamp(Value(SteerAction), -1.f, 1.f);
-	Driver.Throttle = bReverse ? Brake : Throttle;
-	Driver.Brake = bReverse ? Throttle : Brake;
+	Driver.Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
+	Driver.Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
 	Driver.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
-	Driver.GearRequest = bReverse ? -1 : 1;
 	Driver.TractionControl = TractionControl;
 	Driver.bHuman = true;
 	return Driver;

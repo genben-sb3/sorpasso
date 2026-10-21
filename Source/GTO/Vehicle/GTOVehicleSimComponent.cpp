@@ -41,6 +41,11 @@ namespace
 		return { Q.W, -Q.X, Q.Y, -Q.Z };
 	}
 
+	FQuat ToUnreal(const ultragravity::Quat& Q)
+	{
+		return FQuat(-Q.x, Q.y, -Q.z, Q.w);
+	}
+
 	/** Physics package body motion of the Chaos body, its position at the centre of mass. */
 	ultragravity::BodyMotion ReadBody(FBodyInstanceAsyncPhysicsTickHandle& Handle)
 	{
@@ -58,7 +63,7 @@ namespace
 	{
 		FGTOChassisKinematics Chassis;
 		Chassis.Position = ToUnreal(Body.position);
-		Chassis.Orientation = FQuat(-Body.orientation.x, Body.orientation.y, -Body.orientation.z, Body.orientation.w);
+		Chassis.Orientation = ToUnreal(Body.orientation);
 		Chassis.LinearVelocity = ToUnreal(Body.velocity);
 		Chassis.AngularVelocity = AxialToUnreal(Body.angular_velocity);
 		return Chassis;
@@ -72,7 +77,7 @@ namespace
 		Raw.brake = FMath::Clamp(Input.Brake, 0.f, 1.f);
 		Raw.handbrake = FMath::Clamp(Input.Handbrake, 0.f, 1.f);
 		Raw.gear_request = Input.GearRequest;
-		Raw.driving_aids.traction_control = FMath::Clamp(Input.TractionControl, 0, 5);
+		Raw.driving_aids.traction_control = FMath::Clamp(Input.TractionControl, 0, ultragravity::traction_control_max);
 		return Raw;
 	}
 
@@ -284,24 +289,11 @@ void UGTOVehicleSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 ultragravity::InputPacket UGTOVehicleSimComponent::MakePacket(const FGTODriverInput& Input, const ultragravity::BodyMotion& Body, double Dt)
 {
 	const ultragravity::RawInput Raw = ToRawInput(Input);
-	if (Input.bHuman)
-	{
-		const ultragravity::SmoothingResult Result = ultragravity::smooth(Smoothing, SmoothingParams, Params, Body, Raw, SimulatedTicks, Dt);
-		Smoothing = Result.state;
-		return Result.packet;
-	}
-
-	// A test driver's input goes straight into the packet; the smoothing picks up from it if a human takes over.
-	ultragravity::InputPacket Packet;
-	Packet.tick = SimulatedTicks;
-	Packet.steering = Raw.steering;
-	Packet.throttle = Raw.throttle;
-	Packet.brake = Raw.brake;
-	Packet.handbrake = Raw.handbrake;
-	Packet.gear_request = Raw.gear_request;
-	Packet.driving_aids = Raw.driving_aids;
-	Smoothing = { Packet.steering, Packet.throttle, Packet.brake };
-	return Packet;
+	const ultragravity::SmoothingResult Result = Input.bHuman
+		? ultragravity::smooth(Smoothing, SmoothingParams, Params, Body, Raw, SimulatedTicks, Dt)
+		: ultragravity::pass_through(Raw, SimulatedTicks);
+	Smoothing = Result.state;
+	return Result.packet;
 }
 
 ultragravity::WheelContacts UGTOVehicleSimComponent::SweepWheels(const ultragravity::BodyMotion& Body) const

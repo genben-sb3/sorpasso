@@ -162,3 +162,26 @@ TEST_CASE("Equal raw signals and equal state yield the same input packet") {
     CHECK(a.packet.tick == 7);
     CHECK(a.packet.gear_request == 3);
 }
+
+TEST_CASE("Without smoothing the raw signals become the packet, and the smoothing picks up from there") {
+    const VehicleParams car = sports_coupe();
+    RawInput raw;
+    raw.steering = -0.6;
+    raw.throttle = 0.8;
+    raw.brake = 0.1;
+    raw.gear_request = -1;
+    raw.driving_aids.traction_control = 3;
+
+    const SmoothingResult direct = pass_through(raw, 42);
+    CHECK(direct.packet.tick == 42);
+    CHECK(direct.packet.steering == -0.6);
+    CHECK(direct.packet.throttle == 0.8);
+    CHECK(direct.packet.brake == 0.1);
+    CHECK(direct.packet.gear_request == -1);
+    CHECK(direct.packet.driving_aids.traction_control == 3);
+
+    // A human holding the same keys continues without a jump.
+    const SmoothingResult next = smooth(direct.state, SmoothingParams{}, car, straight_ahead(0.0), raw, 43, dt);
+    CHECK(next.packet.steering == -0.6);
+    CHECK(next.packet.throttle == 0.8);
+}

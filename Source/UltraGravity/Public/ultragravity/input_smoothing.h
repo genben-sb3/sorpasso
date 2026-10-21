@@ -55,9 +55,13 @@ UG_API double steering_limit(const VehicleParams& params, double speed, double p
 
 // Turns raw signals into an input packet. A pure function: reads the
 // last state of the body and writes nothing back. Test drivers and AI
-// do not call it.
+// do not call it, they use pass_through.
 UG_API SmoothingResult smooth(const SmoothingState& state, const SmoothingParams& params,
                        const VehicleParams& vehicle, const BodyMotion& body,
                        const RawInput& raw, std::uint32_t tick, double dt);
+
+// The raw signals unsmoothed as the input packet, for test drivers and AI, together with the
+// smoothing state that continues from that packet if a human takes over.
+UG_API SmoothingResult pass_through(const RawInput& raw, std::uint32_t tick);
 
 } // namespace ultragravity

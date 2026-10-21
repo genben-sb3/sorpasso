@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/GTOLapTimer.h"
+#include "Vehicle/GTOBrakeToReverse.h"
 #include "GameFramework/Pawn.h"
 #include "Vehicle/GTOVehicleTypes.h"
 #include "GTOVehiclePawn.generated.h"
@@ -46,7 +47,7 @@ public:
 
 	const UGTOVehicleSimComponent* GetSim() const { return Sim; }
 
-	/** Drives the car with Input instead of the player's controls, e.g. in tests; unset hands control back. */
+	/** Drives the car with Input instead of the player's, e.g. in tests; unset hands control back. */
 	void SetScriptedInput(const TOptional<FGTODriverInput>& Input) { ScriptedInput = Input; }
 
 	/** Driver input sent to the sim on the last frame. */
@@ -70,7 +71,7 @@ private:
 	void ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data);
 	void PlaceMeshes(const UGTOVehicleDataAsset& Data);
 	void UpdateDisplay();
-	FGTODriverInput ReadDriverInput(float DeltaSeconds);
+	FGTODriverInput ReadDriverInput() const;
 	void ToggleTractionControl();
 	void ToggleTelemetry();
 	void Quit();
@@ -125,11 +126,7 @@ private:
 
 	int32 TractionControl = DefaultTractionControl;
 
-	/** The automatic is in reverse: the brake pedal drives backwards, the throttle pedal brakes. */
-	bool bReverse = false;
-
-	/** How long the car has stood with the brake held and no throttle (s). */
-	float StandingOnBrake = 0.f;
+	FGTOBrakeToReverse BrakeToReverse;
 
 	FTransform StartTransform;
 	TOptional<FGTOLapTimer> LapTimer;

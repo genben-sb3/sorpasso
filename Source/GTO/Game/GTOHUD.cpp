@@ -6,7 +6,10 @@
 #include "Game/GTOLapTimer.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "Vehicle/GTOVehiclePawn.h"
+#include "Vehicle/GTOUnits.h"
 #include "Vehicle/GTOVehicleSimComponent.h"
+
+using namespace GTOUnits;
 
 namespace
 {
@@ -31,12 +34,6 @@ namespace
 	FString FormatTractionControl(int32 Level)
 	{
 		return Level > 0 ? FString::Printf(TEXT("TC %d"), Level) : TEXT("TC off");
-	}
-
-	/** m/s along the car's heading, negative when reversing. */
-	double ForwardSpeed(const FGTOChassisKinematics& Chassis)
-	{
-		return Chassis.Orientation.UnrotateVector(Chassis.LinearVelocity).X;
 	}
 }
 
@@ -86,7 +83,7 @@ void AGTOHUD::DrawLapTimes(const FGTOLapTimer& LapTimer)
 void AGTOHUD::DrawDriveInfo(const AGTOVehiclePawn& Vehicle)
 {
 	const FGTOVehicleState State = Vehicle.GetSim()->GetLatestState();
-	const FString Line = FString::Printf(TEXT("%3.0f km/h    %s    %s"), FMath::Abs(ForwardSpeed(State.Chassis)) * 3.6, *FormatGear(State.Gear), *FormatTractionControl(Vehicle.GetTractionControl()));
+	const FString Line = FString::Printf(TEXT("%3.0f km/h    %s    %s"), FMath::Abs(State.Chassis.GetForwardSpeed()) * KmhPerMps, *FormatGear(State.Gear), *FormatTractionControl(Vehicle.GetTractionControl()));
 	UFont* Font = GEngine->GetMediumFont();
 	constexpr float Scale = 1.5f;
 	float Width = 0.f, Height = 0.f;
@@ -101,13 +98,13 @@ void AGTOHUD::DrawTelemetry(const AGTOVehiclePawn& Vehicle)
 	const auto& Wheels = State.Wheels;
 
 	const FGTODriverInput& Input = Vehicle.GetLastInput();
-	const double Speed = ForwardSpeed(State.Chassis);
+	const double Speed = State.Chassis.GetForwardSpeed();
 
 	TArray<FString> Lines;
 	Lines.Add(FString::Printf(TEXT("Physics  %.0f steps/s  (fixed step %.0f/s)"), Sim->GetTicksPerSecond(), 1.0 / UPhysicsSettings::Get()->AsyncFixedTimeStepSize));
-	Lines.Add(FString::Printf(TEXT("Speed  %.1f km/h"), Speed * 3.6));
+	Lines.Add(FString::Printf(TEXT("Speed  %.1f km/h"), Speed * KmhPerMps));
 	Lines.Add(FString::Printf(TEXT("Input  steer %+.2f  throttle %.2f  brake %.2f  handbrake %.2f  gear request %d  %s"), Input.Steer, Input.Throttle, Input.Brake, Input.Handbrake, Input.GearRequest, *FormatTractionControl(Input.TractionControl)));
-	Lines.Add(FString::Printf(TEXT("Engine  %.0f rpm  gear %s"), State.EngineSpeed * 60.0 / UE_DOUBLE_TWO_PI, *FormatGear(State.Gear)));
+	Lines.Add(FString::Printf(TEXT("Engine  %.0f rpm  gear %s"), State.EngineSpeed * RpmPerRadPerSecond, *FormatGear(State.Gear)));
 	Lines.Add(TEXT(""));
 	Lines.Add(TEXT("Wheel     Load     Travel    Spin       Slip    Angle       Fx        Fy     Grip"));
 	const TCHAR* Names[GTONumWheels] = { TEXT("FL"), TEXT("FR"), TEXT("RL"), TEXT("RR") };

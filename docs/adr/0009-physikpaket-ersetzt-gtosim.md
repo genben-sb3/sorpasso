@@ -6,7 +6,7 @@ status: accepted
 
 SORPASSO hatte zwei Fahrphysik-Kerne: den eigenen, einfachen Sim-Kern GTOSim und das getrennt entstandene Physikpaket „ultragravity“, das für dieses Spiel gebaut wurde und deutlich weiter ist (Antriebsstrang mit Automatik, Sperrdifferenzial, kombinierter Schlupf, Stabilisatoren, Aero, Fahrhilfen, Eingabe-Glättung, Animationsdaten, Telemetrie). Wir behalten nur das Physikpaket: Es kam als ein Commit ohne seine Historie ins Repo (Unreal-Modul `Source/UltraGravity`, CMake-Projekt `ultragravity/`), wird nur noch hier weiterentwickelt, und GTOSim fällt weg, sobald das Auto mit dem Paket in Unreal fährt. Zwei Kerne mit zwei Glossaren und zwei ADR-Reihen hätten jeden Beitrag Zeit gekostet; GTOSim auf den Stand des Pakets auszubauen hätte dessen Arbeit wiederholt.
 
-Für den Reifen gilt das Modell des Pakets: Der Schräglaufwinkel folgt bei jeder Geschwindigkeit über die Relaxationslänge, mit einer Untergrenze der Geschwindigkeit in der Verzögerungsgleichung, damit er im Stand nicht einfriert. Das löst ADR 0002 ab, das die Relaxation unterhalb einer Mindestgeschwindigkeit abschaltete und erst darüber einblendete.
+Für den Reifen gilt das Modell des Pakets: Der Schräglaufwinkel folgt bei jeder Geschwindigkeit über die Relaxationslänge, mit einer Untergrenze der Geschwindigkeit in der Verzögerungsgleichung, damit er im Stand nicht einfriert. Das löst ADR 0002 ab, das die Relaxation unterhalb einer Mindestgeschwindigkeit abschaltete und erst darüber einblendete. (Nachtrag aus #23: Das hielt in Unreal nicht, das stehende Auto schaukelte nach einem seitlichen Stoß; ADR 0002 ist wieder in Kraft, siehe dort.)
 
 ## Konsequenzen
 

@@ -10,6 +10,10 @@
 
 namespace ultragravity {
 
+// Reverse only engages below this forward speed, never out of forward travel. A rule of the
+// gearbox for every car, not a tuning value of one, so it is not in the vehicle file.
+inline constexpr double reverse_engage_speed = 0.5; // API, m/s
+
 // Order of the wheels in all per-wheel fields.
 enum Wheel { front_left = 0, front_right = 1, rear_left = 2, rear_right = 3 };
 

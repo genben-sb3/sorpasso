@@ -17,7 +17,7 @@ public:
 	/** The input to apply on Tick. */
 	FGTODriverInput Pop(uint32 Tick);
 
-	/** Drops all queued input and returns to neutral controls. */
+	/** Drops all queued input and returns to neutral input. */
 	void Reset();
 
 private:

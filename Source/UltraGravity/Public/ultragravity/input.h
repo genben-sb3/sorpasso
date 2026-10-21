@@ -4,9 +4,11 @@
 
 namespace ultragravity {
 
+inline constexpr int traction_control_max = 5; // API, highest level of the traction control; larger ones count as this
+
 struct DrivingAids {
     bool abs = false;
-    int traction_control = 0; // level 0 (off) to 5
+    int traction_control = 0; // level 0 (off) to traction_control_max
     bool stability_control = false;
 };
 

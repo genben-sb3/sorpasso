@@ -113,7 +113,7 @@ TEST_CASE("A car pushed sideways at standstill comes to rest without swinging ba
     // The little backward speed comes from the body rolling back upright on its dampers,
     // with the tire yielding as a damper; a tire that springs back reaches -0.23 m/s.
     CHECK(lowest_side_speed > -0.02); // measured: -0.0102 m/s, band: > -2 cm/s
-    CHECK(largest_rest_speed < 1e-3); // measured: 1.5e-5 m/s, band: < 1 mm/s
+    CHECK(largest_rest_speed < 1e-3); // measured: 1.5e-5 m/s, band: < 1 mm/s (wide; the swing-back check above catches the springing tire)
 }
 
 TEST_CASE("A car turned at standstill stops turning without its yaw rate flipping from tick to tick") {
@@ -132,6 +132,7 @@ TEST_CASE("A car turned at standstill stops turning without its yaw rate flippin
     CAPTURE(world.body().angular_velocity.z);
 
     CHECK(yaw_rate.longest_run() < 3); // measured: 0 (118 with the yaw rate fixed over the tick), band: < 3
+    // A wide band: the flipping yaw rate keeps 4.9e-3 rad/s after the second.
     CHECK(std::abs(world.body().angular_velocity.z) < 1e-4); // measured: 4e-12 rad/s, band: < 1e-4 rad/s
 }
 
@@ -151,4 +152,3 @@ TEST_CASE("Two runs with the same input packets yield the same checksum") {
     stand(first_run, tick_first, TestWorld::time_step);
     CHECK(first_run.checksum() != second_run.checksum());
 }
-

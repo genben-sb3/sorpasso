@@ -26,6 +26,9 @@ std::array<WheelMount, wheel_count> wheel_mounts(const VehicleParams& k) {
     }};
 }
 
+// 0 up to start, 1 from end on, linear in between.
+double ramp(double x, double start, double end) { return std::clamp((x - start) / (end - start), 0.0, 1.0); }
+
 // Density of the air from which drag and downforce draw their force.
 constexpr double air_density = 1.2; // kg/m³
 
@@ -125,7 +128,7 @@ double full_throttle_torque(const Engine& e, double speed) {
 // the idle speed, the limiter closes it above the rev limit, and without
 // throttle the engine drags (engine braking).
 double engine_torque(const Engine& e, double speed, double throttle) {
-    const double controller = std::clamp((e.idle_speed - speed) / idle_control_range, 0.0, 1.0); // 1
+    const double controller = 1.0 - ramp(speed, e.idle_speed - idle_control_range, e.idle_speed); // 1
     const double effective = speed >= e.rev_limit ? 0.0 : std::max(throttle, controller);         // 1
     const double drag = e.drag_torque * std::max(speed, 0.0) / e.rev_limit;                      // N·m
     return effective * full_throttle_torque(e, speed) - (1.0 - effective) * drag;
@@ -191,7 +194,7 @@ TireForce tire_force(const WheelSetup& wheel, Vec3 v, double omega, double h, do
     const double kinematic = std::atan(vy / denominator);  // rad
     const double speed = std::hypot(vx, vy); // m/s
     const double lagged = slip_angle + (kinematic - slip_angle) * (1.0 - std::exp(-speed * h / tire.relaxation_length)); // rad
-    const double lag = std::clamp((speed - relaxation_blend_start) / (relaxation_blend_end - relaxation_blend_start), 0.0, 1.0); // 1
+    const double lag = ramp(speed, relaxation_blend_start, relaxation_blend_end); // 1
     slip_angle = kinematic + (lagged - kinematic) * lag;
 
     const double slip = slip_ratio(omega, r, vx); // 1
@@ -284,11 +287,6 @@ double overall_ratio(const Drivetrain& d, int gear) {
     return 0.0;
 }
 
-// Reverse only engages below this forward speed, never out of forward travel.
-// This is a rule of the gearbox that holds for every car, not a tuning value
-// of one vehicle, so it is not in the vehicle file.
-constexpr double reverse_engage_speed = 0.5; // m/s
-
 // The gear the automatic picks next. It works with the engine speed that
 // belongs to the speed over ground: spinning wheels do not push it into the
 // next gear. In a drift it holds the gear.
@@ -325,7 +323,6 @@ int automatic_gear(const State& state, const VehicleParams& k, double brake, Vec
 // clearly below. In between it holds the factor (hysteresis), so it does
 // not switch on and off. Level 0 never intervenes.
 constexpr double tc_target_level0 = 0.30;      // 1, target slip the levels subtract from
-constexpr int    tc_max_level = 5;             // highest level, larger ones are clamped
 constexpr double tc_target_min = 0.01;         // 1, lower bound of the target slip
 constexpr double tc_target_per_level = 0.05;   // 1, less target slip per level
 constexpr double tc_lower_threshold = 0.8;     // 1, fraction of the target below which throttle returns
@@ -335,7 +332,7 @@ constexpr double tc_restore_rate = 0.5;        // 1/s, throttle factor restored 
 double traction_factor(double factor, int level, const DrivenAxles& driven,
                        const std::array<double, wheel_count>& wheel_speed, double v_longitudinal, double dt) {
     if (level <= 0) return 1.0;
-    const double target = std::max(tc_target_level0 - tc_target_per_level * std::min(level, tc_max_level), tc_target_min); // 1
+    const double target = std::max(tc_target_level0 - tc_target_per_level * std::min(level, traction_control_max), tc_target_min); // 1
     double slip = 0.0; // 1, largest drive slip
     for (int i = 0; i < driven.count; ++i) {
         const DrivenAxle& a = driven.axles[i];
@@ -477,7 +474,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     // and again within the engage time after a shift.
     const Automatic& au = drivetrain.gearbox.automatic;
     const double after_shift = // 1
-        automatic ? std::clamp((result.state.gear_age - drivetrain.gearbox.shift_time) / std::max(au.engage_time, dt), 0.0, 1.0)
+        automatic ? ramp(result.state.gear_age, drivetrain.gearbox.shift_time, drivetrain.gearbox.shift_time + std::max(au.engage_time, dt))
                   : 1.0;
     double wheel_inertia_inverse = 0.0; // 1/(kg·m²), wheels as seen by an impulse at the gearbox input
     for (int i = 0; i < driven.count; ++i) {
@@ -525,9 +522,8 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
             result.forces.torque += torque * substep_weight;
         }
         body_dv += total_tire_force * (h / params.mass);
-        const Vec3 torque_vehicle = rotate_inverse(body.orientation, total_tire_torque); // N·m
-        const Vec3 I = params.inertia; // kg·m²
-        body_dw += rotate(body.orientation, {torque_vehicle.x / I.x, torque_vehicle.y / I.y, torque_vehicle.z / I.z}) * h;
+        // Only what the tire torque adds; the gyroscopic term stays with the body's own integration.
+        body_dw += angular_acceleration(body.orientation, params.inertia, {}, total_tire_torque) * h;
 
         // The clutch is a limited impulse that brings the engine and the gearbox input
         // to the same speed: if its torque suffices it sticks, otherwise it slips.
@@ -535,7 +531,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         double drive_impulse = 0.0; // N·m·s at the gearbox input
         if (ratio != 0.0 && result.state.shift_remaining == 0.0) {
             const double clutch_engagement = // 1
-                automatic ? std::clamp((engine_speed - drivetrain.engine.idle_speed) / au.engage_range, 0.0, 1.0) *
+                automatic ? ramp(engine_speed, drivetrain.engine.idle_speed, drivetrain.engine.idle_speed + au.engage_range) *
                                 after_shift
                           : 1.0 - input.clutch;
             const double input_speed = input_shaft_speed(driven, free_speed) * ratio; // rad/s

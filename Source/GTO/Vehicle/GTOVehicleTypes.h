@@ -39,6 +39,9 @@ struct FGTOChassisKinematics
 	FQuat Orientation = FQuat::Identity;
 	FVector LinearVelocity = FVector::ZeroVector;  // m/s
 	FVector AngularVelocity = FVector::ZeroVector; // rad/s
+
+	/** Speed along the heading (m/s), negative when reversing. */
+	double GetForwardSpeed() const { return Orientation.UnrotateVector(LinearVelocity).X; }
 };
 
 struct FGTOWheelState

@@ -57,4 +57,14 @@ constexpr Vec3 rotate(Quat q, Vec3 v) {
 // Rotates v from the world frame into the vehicle frame.
 constexpr Vec3 rotate_inverse(Quat q, Vec3 v) { return rotate({q.w, -q.x, -q.y, -q.z}, v); }
 
+// Angular acceleration of a rigid body by Euler's equations about its principal axes. Orientation,
+// angular velocity and torque as in BodyMotion (world frame), the principal moments of inertia in the
+// vehicle frame; the result in the world frame.
+inline Vec3 angular_acceleration(Quat orientation, Vec3 inertia, Vec3 angular_velocity, Vec3 torque) {
+    const Vec3 t = rotate_inverse(orientation, torque);
+    const Vec3 w = rotate_inverse(orientation, angular_velocity);
+    const Vec3 gyro = cross(w, {inertia.x * w.x, inertia.y * w.y, inertia.z * w.z});
+    return rotate(orientation, {(t.x - gyro.x) / inertia.x, (t.y - gyro.y) / inertia.y, (t.z - gyro.z) / inertia.z});
+}
+
 } // namespace ultragravity

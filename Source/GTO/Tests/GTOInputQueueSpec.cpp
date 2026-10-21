@@ -18,7 +18,7 @@ END_DEFINE_SPEC(FGTOInputQueueSpec)
 
 void FGTOInputQueueSpec::Define()
 {
-	It("gives neutral controls before any input arrives", [this]()
+	It("gives neutral input before any input arrives", [this]()
 	{
 		FGTOInputQueue Queue;
 		TestEqual(TEXT("throttle"), Queue.Pop(7).Throttle, 0.f);

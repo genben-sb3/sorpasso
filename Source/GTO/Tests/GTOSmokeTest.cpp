@@ -354,7 +354,7 @@ namespace
 
 		virtual bool Step(uint32 Ticks) override
 		{
-			FGTODriverInput Packet;
+			FGTODriverInput Input;
 			const FGTOChassisKinematics Chassis = Sim()->GetLatestState().Chassis;
 			if (Ticks < TicksFor(SettleSeconds))
 			{
@@ -362,12 +362,12 @@ namespace
 			}
 			else if (Ticks < TicksFor(SettleSeconds + DriveSeconds))
 			{
-				Packet.Throttle = 0.6f;
+				Input.Throttle = 0.6f;
 				TopSpeed = FMath::Max(TopSpeed, Chassis.LinearVelocity.Size());
 			}
 			else if (Ticks < TicksFor(SettleSeconds + DriveSeconds + BrakeSeconds))
 			{
-				Packet.Brake = 1.f;
+				Input.Brake = 1.f;
 			}
 			else
 			{
@@ -375,7 +375,7 @@ namespace
 				Check(Chassis);
 				return true;
 			}
-			Vehicle->SetScriptedInput(Packet);
+			Vehicle->SetScriptedInput(Input);
 			return false;
 		}
 
@@ -710,20 +710,20 @@ namespace
 				Test.AddError(TEXT("the car has no lap timer"));
 				return true;
 			}
-			FGTODriverInput Packet;
+			FGTODriverInput Input;
 			if (Ticks >= TicksFor(1.0) && Ticks < TicksFor(5.0))
 			{
-				Packet.Throttle = 0.5f;
+				Input.Throttle = 0.5f;
 			}
 			if (Ticks < TicksFor(5.0))
 			{
-				Vehicle->SetScriptedInput(Packet);
+				Vehicle->SetScriptedInput(Input);
 				return false;
 			}
 			if (!bReset)
 			{
 				LapAfterCrossing = Timer->GetCurrentLapTime();
-				Vehicle->SetScriptedInput(Packet);
+				Vehicle->SetScriptedInput(Input);
 				Vehicle->ResetToStart();
 				bReset = true;
 				return false;
@@ -830,9 +830,9 @@ namespace
 			}
 
 			const uint32 Since = Ticks - *PlacedAt;
-			FGTODriverInput Packet;
-			Packet.Throttle = Since < TicksFor(1.0) ? 0.f : 0.7f; // settle, then straight on
-			Vehicle->SetScriptedInput(Packet);
+			FGTODriverInput Input;
+			Input.Throttle = Since < TicksFor(1.0) ? 0.f : 0.7f; // settle, then straight on
+			Vehicle->SetScriptedInput(Input);
 			Watch(Since);
 
 			const bool bDone = GrassAt && Since - *GrassAt >= TicksFor(OnGrassSeconds);

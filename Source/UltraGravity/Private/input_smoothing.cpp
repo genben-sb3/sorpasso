@@ -73,4 +73,18 @@ SmoothingResult smooth(const SmoothingState& state, const SmoothingParams& p,
     return e;
 }
 
+SmoothingResult pass_through(const RawInput& raw, std::uint32_t tick) {
+    SmoothingResult e;
+    e.packet.tick = tick;
+    e.packet.steering = std::clamp(raw.steering, -1.0, 1.0);
+    e.packet.throttle = std::clamp(raw.throttle, 0.0, 1.0);
+    e.packet.brake = std::clamp(raw.brake, 0.0, 1.0);
+    e.packet.clutch = raw.clutch;
+    e.packet.handbrake = raw.handbrake;
+    e.packet.gear_request = raw.gear_request;
+    e.packet.driving_aids = raw.driving_aids;
+    e.state = {e.packet.steering, e.packet.throttle, e.packet.brake};
+    return e;
+}
+
 } // namespace ultragravity

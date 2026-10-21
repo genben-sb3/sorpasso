@@ -50,14 +50,8 @@ void TestWorld::tick(const InputPacket& input) {
     body_.position += body_.velocity * dt;
 
     const Quat q = body_.orientation;
-    const Vec3 I = params_.inertia;
-    const Vec3 torque = rotate_inverse(q, last_step_.forces.torque);
-    Vec3 w_vehicle = rotate_inverse(q, body_.angular_velocity);
-    const Vec3& w = w_vehicle;
-    const Vec3 gyro = cross(w, {I.x * w.x, I.y * w.y, I.z * w.z});
-    w_vehicle += Vec3{(torque.x - gyro.x) / I.x, (torque.y - gyro.y) / I.y,
-                      (torque.z - gyro.z) / I.z} * dt;
-    body_.angular_velocity = rotate(q, w_vehicle);
+    body_.angular_velocity +=
+        angular_acceleration(q, params_.inertia, body_.angular_velocity, last_step_.forces.torque) * dt;
 
     const Vec3 w_world = body_.angular_velocity;
     const Quat dq = Quat{0.0, w_world.x, w_world.y, w_world.z} * q;

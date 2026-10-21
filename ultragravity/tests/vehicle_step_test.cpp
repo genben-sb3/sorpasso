@@ -103,7 +103,7 @@ TEST_CASE("The lateral force builds up over the relaxation length") {
     // length in 15 ticks. At 1° the tire is almost linear.
     const double ticks_per_sigma = 15.0; // ticks per relaxation length
     const double vx = sigma * 120.0 / ticks_per_sigma; // m/s
-    REQUIRE(vx > 10.0);
+    REQUIRE(vx > 10.0); // above the speed from which the lag acts fully (ADR 0002)
     BodyMotion body;
     body.position = {0.0, 0.0, 0.5};
     body.velocity = {vx, -vx * std::tan(std::numbers::pi / 180.0), 0.0};
@@ -142,7 +142,7 @@ TEST_CASE("At a large slip angle the full sliding speed counts for the relaxatio
     // ticks. Longitudinally alone it would be only 0.87 of that.
     const double speed = sigma * 120.0 / 15.0;               // m/s
     const double angle = 30.0 * std::numbers::pi / 180.0;    // rad
-    REQUIRE(speed * std::cos(angle) > 10.0);
+    REQUIRE(speed * std::cos(angle) > 10.0); // above the speed from which the lag acts fully (ADR 0002)
     BodyMotion body;
     body.position = {0.0, 0.0, 0.5};
     body.velocity = {speed * std::cos(angle), -speed * std::sin(angle), 0.0};
