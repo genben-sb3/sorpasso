@@ -23,6 +23,9 @@ public:
 	void Advance(double FrameDt);
 	FGTOVehicleState Sample() const;
 
+	/** Where Sample stands between the previous and the latest snapshot: 0 at the previous, 1 at the latest. */
+	double GetAlpha() const;
+
 private:
 	FGTOVehicleState Previous;
 	FGTOVehicleState Latest;

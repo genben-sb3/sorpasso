@@ -66,7 +66,10 @@ public:
 	 */
 	FGTOVehicleState GetLatestState(double* OutSimTime = nullptr) const;
 
-	/** Snapshot interpolated between the last two for the current frame. */
+	/**
+	 * Snapshot interpolated between the last two for the current frame. Wheel spin, travel and steer angle and the
+	 * steering wheel come from the physics package's animation data, blended by the package.
+	 */
 	FGTOVehicleState GetDisplayState() const;
 
 	/** Sim ticks since the component started. */
@@ -96,6 +99,9 @@ private:
 	ultragravity::SmoothingParams SmoothingParams;
 	ultragravity::SmoothingState Smoothing; // carried from step to step
 	FGTOVehicleState Stepped; // wheels, gear and engine as the last step left them; its chassis is unused
+	ultragravity::AnimationData SteppedAnimation;  // of the last step
+	ultragravity::AnimationData PreviousAnimation; // of the previous snapshot in Display
+	ultragravity::AnimationData LatestAnimation;   // of the latest snapshot in Display
 	FGTOVehicleState Latest; // see GetLatestState
 	double LatestSimTime = 0.0;
 	double NextSimTime = 0.0;

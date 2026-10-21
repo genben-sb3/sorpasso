@@ -41,6 +41,23 @@ namespace
 	constexpr float PedalPressed = 0.5f;
 	constexpr float PedalReleased = 0.05f;
 
+	// The stand-in steering wheel: a rim with a cross spoke and a lower spoke, so its turn shows (cm, in the column's
+	// axes: Z towards the driver, X up along the wheel when it is straight).
+	constexpr double SteeringWheelDiameter = 36.0; // cm
+	constexpr double SteeringWheelThickness = 3.0; // cm
+	constexpr double SpokeThickness = 3.5;         // cm
+
+	UStaticMeshComponent* MakeShape(AActor* Owner, FName Name, USceneComponent* Parent, UStaticMesh* Mesh, const FVector& Location, const FVector& SizeCm)
+	{
+		UStaticMeshComponent* Shape = Owner->CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		Shape->SetupAttachment(Parent);
+		Shape->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		Shape->SetStaticMesh(Mesh);
+		Shape->SetRelativeLocation(Location);
+		Shape->SetRelativeScale3D(SizeCm / 100.0); // the basic shapes measure 1 m
+		return Shape;
+	}
+
 	UInputAction* MakeButtonAction(UObject* Outer, FName Name)
 	{
 		UInputAction* Action = NewObject<UInputAction>(Outer, Name);
@@ -106,6 +123,20 @@ AGTOVehiclePawn::AGTOVehiclePawn()
 		Wheel->SetRelativeRotation(FRotator(0.0, GTOIsLeft(static_cast<EGTOWheel>(Index)) ? 0.0 : 180.0, 0.0));
 		WheelMeshes.Add(Wheel);
 	}
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	SteeringColumn = CreateDefaultSubobject<USceneComponent>(TEXT("SteeringColumn"));
+	SteeringColumn->SetupAttachment(DisplayRoot);
+	SteeringWheel = CreateDefaultSubobject<USceneComponent>(TEXT("SteeringWheel"));
+	SteeringWheel->SetupAttachment(SteeringColumn);
+	constexpr double Front = 0.5 * SteeringWheelThickness + 0.5 * SpokeThickness; // cm, spokes on the driver's side of the rim
+	MakeShape(this, TEXT("SteeringWheelRim"), SteeringWheel, Cylinder.Object, FVector::ZeroVector,
+		FVector(SteeringWheelDiameter, SteeringWheelDiameter, SteeringWheelThickness));
+	MakeShape(this, TEXT("SteeringWheelCrossSpoke"), SteeringWheel, Cube.Object, FVector(0.0, 0.0, Front),
+		FVector(SpokeThickness, SteeringWheelDiameter, SpokeThickness));
+	MakeShape(this, TEXT("SteeringWheelLowerSpoke"), SteeringWheel, Cube.Object, FVector(-0.25 * SteeringWheelDiameter, 0.0, Front),
+		FVector(0.5 * SteeringWheelDiameter, SpokeThickness, SpokeThickness));
 
 	CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
 	CameraArm->SetupAttachment(DisplayRoot);
@@ -177,7 +208,6 @@ void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
 	PlaceMeshes(Data);
 	bReverse = false;
 	StandingOnBrake = 0.f;
-	WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 	if (LapTimer)
 	{
 		LapTimer->Discard();
@@ -211,6 +241,8 @@ void AGTOVehiclePawn::PlaceMeshes(const UGTOVehicleDataAsset& Data)
 	{
 		WheelMeshes[Index]->SetRelativeScale3D(FVector(Sim->GetWheelRadius(static_cast<EGTOWheel>(Index)) * CmPerM / Data.WheelMeshRadius));
 	}
+	// Pitched so the column's Z axis leans from straight up back towards the driver by the tilt.
+	SteeringColumn->SetRelativeLocationAndRotation(Sim->GetVehicleFrameOrigin() * CmPerM + Data.SteeringWheelOrigin, FRotator(90.0 - Data.SteeringWheelTilt, 0.0, 0.0));
 }
 
 void AGTOVehiclePawn::Tick(float DeltaSeconds)
@@ -226,11 +258,6 @@ void AGTOVehiclePawn::Tick(float DeltaSeconds)
 		LapTimer->Update(SimTime, Latest.Chassis.Position);
 	}
 
-	const FGTOVehicleState Shown = Sim->GetDisplayState();
-	for (int32 Index = 0; Index < GTONumWheels; ++Index)
-	{
-		WheelSpin[Index] = FMath::Fmod(WheelSpin[Index] + Shown.Wheels[Index].AngularVelocity * DeltaSeconds, UE_DOUBLE_TWO_PI);
-	}
 	UpdateDisplay();
 }
 
@@ -246,12 +273,15 @@ void AGTOVehiclePawn::UpdateDisplay()
 		// Steered about the vertical, spun about the axle. The right wheels are the left mesh turned around, so for them
 		// rolling forward is a positive pitch in mesh space.
 		const bool bLeft = GTOIsLeft(static_cast<EGTOWheel>(Index));
-		const FRotator Rotation(FMath::RadiansToDegrees(WheelSpin[Index]) * (bLeft ? -1.0 : 1.0), FMath::RadiansToDegrees(Shown.Wheels[Index].SteerAngle) + (bLeft ? 0.0 : 180.0), 0.0);
+		const FRotator Rotation(FMath::RadiansToDegrees(Shown.Wheels[Index].SpinAngle) * (bLeft ? -1.0 : 1.0), FMath::RadiansToDegrees(Shown.Wheels[Index].SteerAngle) + (bLeft ? 0.0 : 180.0), 0.0);
 
 		UStaticMeshComponent* WheelMesh = WheelMeshes[Index];
 		const FVector MeshCentre = WheelMesh->GetStaticMesh() ? WheelMesh->GetStaticMesh()->GetBounds().Origin * WheelMesh->GetRelativeScale3D() : FVector::ZeroVector;
 		WheelMesh->SetRelativeLocationAndRotation(Centre - Rotation.RotateVector(MeshCentre), Rotation);
 	}
+
+	// A positive yaw about the column turns the wheel clockwise as the driver sees it, as for steering right.
+	SteeringWheel->SetRelativeRotation(FRotator(0.0, FMath::RadiansToDegrees(Shown.SteeringWheelAngle), 0.0));
 }
 
 void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

@@ -76,6 +76,19 @@ namespace
 		return Raw;
 	}
 
+	/** Puts the animation data of the physics package into a snapshot. */
+	void ApplyAnimation(const ultragravity::AnimationData& Animation, FGTOVehicleState& State)
+	{
+		for (int32 Index = 0; Index < GTONumWheels; ++Index)
+		{
+			FGTOWheelState& Wheel = State.Wheels[Index];
+			Wheel.Compression = Animation.suspension_travel[Index];
+			Wheel.SpinAngle = Animation.wheel_angle[Index];
+			Wheel.SteerAngle = -Animation.steer_angle[Index];
+		}
+		State.SteeringWheelAngle = -Animation.steering_wheel;
+	}
+
 	/** The car's wheels, gear and engine as one step of the physics package left them. */
 	FGTOVehicleState ToStepped(const ultragravity::StepResult& Result, const ultragravity::WheelContacts& Contacts)
 	{
@@ -85,16 +98,15 @@ namespace
 		for (int32 Index = 0; Index < GTONumWheels; ++Index)
 		{
 			FGTOWheelState& Wheel = Stepped.Wheels[Index];
-			Wheel.Compression = Result.animation.suspension_travel[Index];
 			Wheel.Load = Result.telemetry.wheel_load[Index];
 			Wheel.AngularVelocity = Result.state.wheel_speed[Index];
-			Wheel.SteerAngle = -Result.animation.steer_angle[Index];
 			Wheel.SlipRatio = Result.telemetry.slip[Index];
 			Wheel.SlipAngle = -Result.telemetry.slip_angle[Index];
 			Wheel.LongitudinalForce = Result.telemetry.force_longitudinal[Index];
 			Wheel.LateralForce = -Result.telemetry.force_lateral[Index];
 			Wheel.SurfaceFriction = Contacts[Index].contact ? Contacts[Index].friction : 0.0;
 		}
+		ApplyAnimation(Result.animation, Stepped);
 		return Stepped;
 	}
 
@@ -123,6 +135,7 @@ void UGTOVehicleSimComponent::Restart(UPrimitiveComponent* Body, const ultragrav
 	State = ultragravity::rolling_state(Params, 0.0);
 	Smoothing = ultragravity::SmoothingState();
 	Stepped = FGTOVehicleState();
+	SteppedAnimation = PreviousAnimation = LatestAnimation = ultragravity::AnimationData();
 	Latest = FGTOVehicleState();
 	Latest.Chassis.Position = Body->GetComponentLocation() / CmPerM;
 	Latest.Chassis.Orientation = Body->GetComponentQuat();
@@ -197,7 +210,9 @@ FGTOVehicleState UGTOVehicleSimComponent::GetLatestState(double* OutSimTime) con
 FGTOVehicleState UGTOVehicleSimComponent::GetDisplayState() const
 {
 	FScopeLock ScopeLock(&Lock);
-	return Display.Sample();
+	FGTOVehicleState Shown = Display.Sample();
+	ApplyAnimation(ultragravity::interpolate(PreviousAnimation, LatestAnimation, Display.GetAlpha()), Shown);
+	return Shown;
 }
 
 uint32 UGTOVehicleSimComponent::GetSimulatedTicks() const
@@ -228,12 +243,15 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	Latest.Chassis = ToChassis(Body);
 	LatestSimTime = NextSimTime;
 	Display.Push(Latest);
+	PreviousAnimation = LatestAnimation;
+	LatestAnimation = SteppedAnimation;
 
 	const ultragravity::WheelContacts Contacts = SweepWheels(Body);
 	const ultragravity::InputPacket Packet = MakePacket(InputQueue.Pop(SimulatedTicks), Body, DeltaTime);
 	const ultragravity::StepResult Result = ultragravity::vehicle_step(State, Params, Packet, Contacts, Body, DeltaTime);
 	State = Result.state;
 	Stepped = ToStepped(Result, Contacts);
+	SteppedAnimation = Result.animation;
 	++SimulatedTicks;
 	NextSimTime += DeltaTime;
 

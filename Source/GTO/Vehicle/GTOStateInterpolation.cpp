@@ -21,9 +21,13 @@ FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVeh
 		Wheel.LongitudinalForce = FMath::Lerp(A.LongitudinalForce, B.LongitudinalForce, Alpha);
 		Wheel.LateralForce = FMath::Lerp(A.LateralForce, B.LateralForce, Alpha);
 		Wheel.SurfaceFriction = Alpha < 0.5 ? A.SurfaceFriction : B.SurfaceFriction;
+		// A plain blend would spin the wheel backwards across the wrap at ±π; the adapter blends the spin with the
+		// physics package's animation data instead.
+		Wheel.SpinAngle = Alpha < 0.5 ? A.SpinAngle : B.SpinAngle;
 	}
 	Result.Gear = Alpha < 0.5 ? From.Gear : To.Gear;
 	Result.EngineSpeed = FMath::Lerp(From.EngineSpeed, To.EngineSpeed, Alpha);
+	Result.SteeringWheelAngle = FMath::Lerp(From.SteeringWheelAngle, To.SteeringWheelAngle, Alpha);
 	return Result;
 }
 
@@ -54,5 +58,10 @@ void FGTOSnapshotInterpolator::Advance(double FrameDt)
 
 FGTOVehicleState FGTOSnapshotInterpolator::Sample() const
 {
-	return GTOInterpolateState(Previous, Latest, StepDt > 0.0 ? Remainder / StepDt : 1.0);
+	return GTOInterpolateState(Previous, Latest, GetAlpha());
+}
+
+double FGTOSnapshotInterpolator::GetAlpha() const
+{
+	return StepDt > 0.0 ? Remainder / StepDt : 1.0;
 }

@@ -506,6 +506,101 @@ namespace
 		int32 MinGear = 0;
 	};
 
+	/**
+	 * Settled car → forward → steer right → stop → reverse, watched through the display state the pawn shows: the wheels
+	 * stand on compressed springs, spin forward and backward as far as the car rolls, the front wheels and the steering
+	 * wheel turn right, the rear wheels do not steer.
+	 */
+	class FDisplayFollowsPhysicsRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		virtual bool Step(uint32 Ticks) override
+		{
+			const FGTOVehicleState Shown = Sim()->GetDisplayState();
+			const double Spin = Shown.Wheels[static_cast<int32>(EGTOWheel::FrontLeft)].SpinAngle;
+			if (PreviousSpin)
+			{
+				// The shown angle wraps at ±π; a wheel turns far less than half a revolution per frame.
+				SpinThisPhase += FMath::UnwindRadians(Spin - *PreviousSpin);
+			}
+			PreviousSpin = Spin;
+
+			FGTODriverInput Input;
+			const double Seconds = Ticks * UPhysicsSettings::Get()->AsyncFixedTimeStepSize;
+			const double Along = FVector::DotProduct(Shown.Chassis.Position, Start.GetRotation().GetForwardVector()); // m
+			if (Seconds < 1.0)
+			{
+				RestCompression = Shown.Wheels[static_cast<int32>(EGTOWheel::RearRight)].Compression;
+				SpinThisPhase = 0.0;
+				PhaseStart = Along;
+			}
+			else if (Seconds < 3.0)
+			{
+				Input.Throttle = 0.3f;
+				ForwardSpin = SpinThisPhase;
+				ForwardRoll = (Along - PhaseStart) / Sim()->GetWheelRadius(EGTOWheel::FrontLeft);
+			}
+			else if (Seconds < 3.5)
+			{
+				Input.Steer = 0.5f;
+				FrontSteer = Shown.Wheels[static_cast<int32>(EGTOWheel::FrontRight)].SteerAngle;
+				RearSteer = FMath::Max(RearSteer, FMath::Abs(Shown.Wheels[static_cast<int32>(EGTOWheel::RearLeft)].SteerAngle));
+				SteeringWheel = Shown.SteeringWheelAngle;
+			}
+			else if (Seconds < 6.0)
+			{
+				Input.Brake = 1.f;
+				SpinThisPhase = 0.0;
+				PhaseStart = Along;
+			}
+			else if (Seconds < 8.0)
+			{
+				Input.GearRequest = -1;
+				Input.Throttle = 0.3f;
+				BackwardSpin = SpinThisPhase;
+				BackwardRoll = (Along - PhaseStart) / Sim()->GetWheelRadius(EGTOWheel::FrontLeft);
+			}
+			else
+			{
+				Vehicle->SetScriptedInput({});
+				Check();
+				return true;
+			}
+			Vehicle->SetScriptedInput(Input);
+			return false;
+		}
+
+		void Check()
+		{
+			Test.AddInfo(FString::Printf(TEXT("travel at rest %.4f m, spin forward %.2f rad (rolled %.2f rad) and backward %.2f rad (rolled %.2f rad), front steer %.2f deg, rear steer %.2f deg, steering wheel %.1f deg"),
+				RestCompression, ForwardSpin, ForwardRoll, BackwardSpin, BackwardRoll, FMath::RadiansToDegrees(FrontSteer), FMath::RadiansToDegrees(RearSteer), FMath::RadiansToDegrees(SteeringWheel)));
+			Test.TestTrue(FString::Printf(TEXT("springs compressed at rest (%.4f m)"), RestCompression), RestCompression > 0.03);
+			// The undriven front wheel rolls with the car: its spin is the distance over its radius, give or take a little slip.
+			Test.TestTrue(FString::Printf(TEXT("wheels roll forward with the car (%.2f rad)"), ForwardRoll), ForwardRoll > 3.0);
+			Test.TestNearlyEqual(TEXT("and spin as far as they roll (rad)"), ForwardSpin, ForwardRoll, 0.05 * ForwardRoll);
+			Test.TestTrue(FString::Printf(TEXT("wheels roll backward when reversing (%.2f rad)"), BackwardRoll), BackwardRoll < -3.0);
+			Test.TestNearlyEqual(TEXT("and spin backward as far as they roll (rad)"), BackwardSpin, BackwardRoll, 0.05 * FMath::Abs(BackwardRoll));
+			Test.TestTrue(FString::Printf(TEXT("front wheels steer right (%.2f deg)"), FMath::RadiansToDegrees(FrontSteer)), FrontSteer > FMath::DegreesToRadians(5.0));
+			Test.TestEqual(TEXT("rear wheels do not steer"), RearSteer, 0.0);
+			Test.TestTrue(FString::Printf(TEXT("steering wheel turns right (%.1f deg)"), FMath::RadiansToDegrees(SteeringWheel)), SteeringWheel > FMath::DegreesToRadians(45.0));
+		}
+
+		TOptional<double> PreviousSpin;
+		double SpinThisPhase = 0.0;
+		double RestCompression = 0.0;
+		double PhaseStart = 0.0;   // m along the start heading
+		double ForwardSpin = 0.0;  // rad, shown
+		double ForwardRoll = 0.0;  // rad, distance over radius
+		double BackwardSpin = 0.0; // rad, shown
+		double BackwardRoll = 0.0; // rad, distance over radius
+		double FrontSteer = 0.0;
+		double RearSteer = 0.0;
+		double SteeringWheel = 0.0;
+	};
+
 	/** Friction of one of the test track's physical materials, e.g. "PM_Grass". */
 	double SurfaceFriction(const TCHAR* Name)
 	{
@@ -865,6 +960,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOReversesTest, "GTO.Smoke.Reverses", SmokeTe
 bool FGTOReversesTest::RunTest(const FString& Parameters)
 {
 	PlayMap<FReversesRun>(*this, FlatTestMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTODisplayFollowsPhysicsTest, "GTO.Smoke.DisplayFollowsPhysics", SmokeTestFlags)
+
+bool FGTODisplayFollowsPhysicsTest::RunTest(const FString& Parameters)
+{
+	PlayMap<FDisplayFollowsPhysicsRun>(*this, FlatTestMap);
 	return true;
 }
 

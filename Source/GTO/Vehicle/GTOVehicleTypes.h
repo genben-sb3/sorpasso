@@ -46,6 +46,7 @@ struct FGTOWheelState
 	double Compression = 0.0;       // m, 0 at full droop or in the air
 	double Load = 0.0;              // N, along the contact normal, never negative
 	double AngularVelocity = 0.0;   // rad/s, positive rolling forward
+	double SpinAngle = 0.0;         // rad, how far the wheel has turned, positive rolling forward, in [-π, π)
 	double SteerAngle = 0.0;        // rad, positive to the right
 	double SlipRatio = 0.0;         // positive when driving
 	double SlipAngle = 0.0;         // rad, as the tyre feels it after relaxation; positive when the tyre is pushed right
@@ -59,6 +60,7 @@ struct FGTOVehicleState
 {
 	FGTOChassisKinematics Chassis; // the kinematics the last step was computed from
 	TStaticArray<FGTOWheelState, GTONumWheels> Wheels;
-	int32 Gear = 0;           // -1 reverse, 0 neutral, 1 … n forward gears
-	double EngineSpeed = 0.0; // rad/s
+	int32 Gear = 0;                  // -1 reverse, 0 neutral, 1 … n forward gears
+	double EngineSpeed = 0.0;        // rad/s
+	double SteeringWheelAngle = 0.0; // rad, rotation of the steering wheel, positive to the right
 };

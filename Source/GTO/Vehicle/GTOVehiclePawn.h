@@ -91,6 +91,14 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> WheelMeshes;
 
+	/** Placed and tilted from the vehicle data; its Z axis points along the column towards the driver. */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<USceneComponent> SteeringColumn;
+
+	/** Turns about the column. Carries a stand-in from basic shapes until the body mesh brings a steering wheel of its own. */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<USceneComponent> SteeringWheel;
+
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<USpringArmComponent> CameraArm;
 
@@ -127,7 +135,4 @@ private:
 	TOptional<FGTOLapTimer> LapTimer;
 	TOptional<FGTODriverInput> ScriptedInput;
 	FGTODriverInput LastInput;
-
-	/** Display only: how far each wheel has turned, in EGTOWheel order (rad). */
-	TStaticArray<double, GTONumWheels> WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 };

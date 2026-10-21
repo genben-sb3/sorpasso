@@ -53,6 +53,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display")
 	FVector BodyMeshOrigin = FVector(-135.0, 0.0, 8.0);
 
+	/** Centre of the steering wheel in the vehicle file's frame, with Unreal axes (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display")
+	FVector SteeringWheelOrigin = FVector(-115.0, -37.0, 78.0);
+
+	/** How far the steering wheel leans back from upright towards the driver (deg). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Display", meta = (ClampMin = 0, ClampMax = 90))
+	double SteeringWheelTilt = 25.0;
+
 	/** Full path of the vehicle file. */
 	FString GetVehicleFilePath() const;
 
