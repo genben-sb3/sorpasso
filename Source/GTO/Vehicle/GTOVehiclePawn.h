@@ -55,6 +55,12 @@ public:
 	/** Session lap times, or null on a map without a start-finish line. */
 	const FGTOLapTimer* GetLapTimer() const { return LapTimer.GetPtrOrNull(); }
 
+	/** Level of the traction control the player has chosen, 0 for off. */
+	int32 GetTractionControl() const { return TractionControl; }
+
+	/** The level the traction control key switches on. */
+	static constexpr int32 DefaultTractionControl = 2;
+
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -64,7 +70,8 @@ private:
 	void ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data);
 	void PlaceMeshes(const UGTOVehicleDataAsset& Data);
 	void UpdateDisplay();
-	FGTODriverInput ReadDriverInput() const;
+	FGTODriverInput ReadDriverInput(float DeltaSeconds);
+	void ToggleTractionControl();
 	void ToggleTelemetry();
 	void Quit();
 
@@ -107,6 +114,14 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> HandbrakeAction;
+
+	int32 TractionControl = DefaultTractionControl;
+
+	/** The automatic is in reverse: the brake pedal drives backwards, the throttle pedal brakes. */
+	bool bReverse = false;
+
+	/** How long the car has stood with the brake held and no throttle (s). */
+	float StandingOnBrake = 0.f;
 
 	FTransform StartTransform;
 	TOptional<FGTOLapTimer> LapTimer;

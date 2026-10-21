@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "HAL/CriticalSection.h"
 #include "PhysicsEngine/BodyInstance.h"
+#include "ultragravity/input_smoothing.h"
 #include "ultragravity/vehicle_file.h"
 #include "ultragravity/vehicle_step.h"
 #include "Vehicle/GTOInputQueue.h"
@@ -16,8 +17,9 @@ class UPrimitiveComponent;
 /**
  * The adapter between Unreal and the physics package (ADR 0001). In the async physics tick of every Chaos step it sweeps
  * one wheel-sized sphere along each probe ray of the package, runs the vehicle step against those wheel contacts and
- * applies the forces, averaged over the package's substeps, to the chassis body. Input arrives through a queue; the
- * game thread reads the results only as copied snapshots.
+ * applies the forces, averaged over the package's substeps, to the chassis body. Driver input arrives through a queue
+ * and becomes the input packet of the tick, a human's through the package's input smoothing. The game thread reads the
+ * results only as copied snapshots.
  *
  * The only place that converts between Unreal (cm, Y right, left-handed) and the package (SI, ISO 8855: Y left).
  * Everything it hands out is in metres with Unreal axes.
@@ -78,6 +80,7 @@ public:
 
 private:
 	ultragravity::WheelContacts SweepWheels(const ultragravity::BodyMotion& Body) const;
+	ultragravity::InputPacket MakePacket(const FGTODriverInput& Input, const ultragravity::BodyMotion& Body, double Dt);
 	void ApplyMassProperties(FBodyInstanceAsyncPhysicsTickHandle& Handle) const;
 
 	UPROPERTY()
@@ -90,7 +93,9 @@ private:
 	bool bHasParams = false;
 	ultragravity::VehicleParams Params;
 	ultragravity::State State; // carried from step to step
-	TStaticArray<FGTOWheelState, GTONumWheels> Wheels; // as the last step left them
+	ultragravity::SmoothingParams SmoothingParams;
+	ultragravity::SmoothingState Smoothing; // carried from step to step
+	FGTOVehicleState Stepped; // wheels, gear and engine as the last step left them; its chassis is unused
 	FGTOVehicleState Latest; // see GetLatestState
 	double LatestSimTime = 0.0;
 	double NextSimTime = 0.0;

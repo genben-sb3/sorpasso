@@ -8,8 +8,8 @@ class AGTOVehiclePawn;
 class FGTOLapTimer;
 
 /**
- * Canvas HUD: the session's lap times, and developer telemetry (controls, and per wheel load, travel, spin, slip, tyre
- * forces and surface grip) that can be switched off.
+ * Canvas HUD: the session's lap times, speed, gear and traction control, and developer telemetry (controls, engine, and
+ * per wheel load, travel, spin, slip, tyre forces and surface grip) that can be switched off.
  */
 UCLASS()
 class GTO_API AGTOHUD : public AHUD
@@ -26,5 +26,6 @@ public:
 
 private:
 	void DrawLapTimes(const FGTOLapTimer& LapTimer);
+	void DrawDriveInfo(const AGTOVehiclePawn& Vehicle);
 	void DrawTelemetry(const AGTOVehiclePawn& Vehicle);
 };

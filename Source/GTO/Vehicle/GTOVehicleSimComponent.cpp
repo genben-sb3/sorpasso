@@ -64,25 +64,27 @@ namespace
 		return Chassis;
 	}
 
-	ultragravity::InputPacket ToPacket(const FGTODriverInput& Input, uint32 Tick)
+	ultragravity::RawInput ToRawInput(const FGTODriverInput& Input)
 	{
-		ultragravity::InputPacket Packet;
-		Packet.tick = Tick;
-		Packet.steering = -FMath::Clamp(Input.Steer, -1.f, 1.f); // the package steers positive to the left
-		Packet.throttle = FMath::Clamp(Input.Throttle, 0.f, 1.f);
-		Packet.brake = FMath::Clamp(Input.Brake, 0.f, 1.f);
-		Packet.handbrake = FMath::Clamp(Input.Handbrake, 0.f, 1.f);
-		Packet.gear_request = Input.GearRequest;
-		return Packet;
+		ultragravity::RawInput Raw;
+		Raw.steering = -FMath::Clamp(Input.Steer, -1.f, 1.f); // the package steers positive to the left
+		Raw.throttle = FMath::Clamp(Input.Throttle, 0.f, 1.f);
+		Raw.brake = FMath::Clamp(Input.Brake, 0.f, 1.f);
+		Raw.handbrake = FMath::Clamp(Input.Handbrake, 0.f, 1.f);
+		Raw.gear_request = Input.GearRequest;
+		Raw.driving_aids.traction_control = FMath::Clamp(Input.TractionControl, 0, 5);
+		return Raw;
 	}
 
-	/** The car's wheels as one step of the physics package left them. */
-	TStaticArray<FGTOWheelState, GTONumWheels> ToWheels(const ultragravity::StepResult& Result, const ultragravity::WheelContacts& Contacts)
+	/** The car's wheels, gear and engine as one step of the physics package left them. */
+	FGTOVehicleState ToStepped(const ultragravity::StepResult& Result, const ultragravity::WheelContacts& Contacts)
 	{
-		TStaticArray<FGTOWheelState, GTONumWheels> Wheels;
+		FGTOVehicleState Stepped;
+		Stepped.Gear = Result.state.gear;
+		Stepped.EngineSpeed = Result.state.engine_speed;
 		for (int32 Index = 0; Index < GTONumWheels; ++Index)
 		{
-			FGTOWheelState& Wheel = Wheels[Index];
+			FGTOWheelState& Wheel = Stepped.Wheels[Index];
 			Wheel.Compression = Result.animation.suspension_travel[Index];
 			Wheel.Load = Result.telemetry.wheel_load[Index];
 			Wheel.AngularVelocity = Result.state.wheel_speed[Index];
@@ -93,7 +95,7 @@ namespace
 			Wheel.LateralForce = -Result.telemetry.force_lateral[Index];
 			Wheel.SurfaceFriction = Contacts[Index].contact ? Contacts[Index].friction : 0.0;
 		}
-		return Wheels;
+		return Stepped;
 	}
 
 	/** Probe rays of the car standing level with its centre of mass at the origin: the wheel mounts in chassis axes. */
@@ -119,7 +121,8 @@ void UGTOVehicleSimComponent::Restart(UPrimitiveComponent* Body, const ultragrav
 	Params = InParams;
 	bHasParams = true;
 	State = ultragravity::rolling_state(Params, 0.0);
-	Wheels = TStaticArray<FGTOWheelState, GTONumWheels>();
+	Smoothing = ultragravity::SmoothingState();
+	Stepped = FGTOVehicleState();
 	Latest = FGTOVehicleState();
 	Latest.Chassis.Position = Body->GetComponentLocation() / CmPerM;
 	Latest.Chassis.Orientation = Body->GetComponentQuat();
@@ -221,16 +224,16 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	const ultragravity::BodyMotion Body = ReadBody(Handle);
 
 	// Snapshot of the previous step: its wheels, with the chassis where Chaos actually moved it (collisions included).
+	Latest = Stepped;
 	Latest.Chassis = ToChassis(Body);
-	Latest.Wheels = Wheels;
 	LatestSimTime = NextSimTime;
 	Display.Push(Latest);
 
 	const ultragravity::WheelContacts Contacts = SweepWheels(Body);
-	const ultragravity::InputPacket Packet = ToPacket(InputQueue.Pop(SimulatedTicks), SimulatedTicks);
+	const ultragravity::InputPacket Packet = MakePacket(InputQueue.Pop(SimulatedTicks), Body, DeltaTime);
 	const ultragravity::StepResult Result = ultragravity::vehicle_step(State, Params, Packet, Contacts, Body, DeltaTime);
 	State = Result.state;
-	Wheels = ToWheels(Result, Contacts);
+	Stepped = ToStepped(Result, Contacts);
 	++SimulatedTicks;
 	NextSimTime += DeltaTime;
 
@@ -258,6 +261,29 @@ void UGTOVehicleSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		RateWindowStart = Now;
 		RateWindowTicks = SimulatedTicks;
 	}
+}
+
+ultragravity::InputPacket UGTOVehicleSimComponent::MakePacket(const FGTODriverInput& Input, const ultragravity::BodyMotion& Body, double Dt)
+{
+	const ultragravity::RawInput Raw = ToRawInput(Input);
+	if (Input.bHuman)
+	{
+		const ultragravity::SmoothingResult Result = ultragravity::smooth(Smoothing, SmoothingParams, Params, Body, Raw, SimulatedTicks, Dt);
+		Smoothing = Result.state;
+		return Result.packet;
+	}
+
+	// A test driver's input goes straight into the packet; the smoothing picks up from it if a human takes over.
+	ultragravity::InputPacket Packet;
+	Packet.tick = SimulatedTicks;
+	Packet.steering = Raw.steering;
+	Packet.throttle = Raw.throttle;
+	Packet.brake = Raw.brake;
+	Packet.handbrake = Raw.handbrake;
+	Packet.gear_request = Raw.gear_request;
+	Packet.driving_aids = Raw.driving_aids;
+	Smoothing = { Packet.steering, Packet.throttle, Packet.brake };
+	return Packet;
 }
 
 ultragravity::WheelContacts UGTOVehicleSimComponent::SweepWheels(const ultragravity::BodyMotion& Body) const

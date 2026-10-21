@@ -32,6 +32,15 @@ namespace
 	// The wheels hang this far above the ground after a reset and settle onto their springs.
 	constexpr double ResetDropHeight = 0.02; // m
 
+	// Brake to reverse: below this speed the car counts as standing, and after the brake has been held this long there
+	// the automatic engages reverse.
+	constexpr double StandstillSpeed = 0.5; // m/s
+	constexpr float ReverseAfter = 0.4f;    // s
+
+	// A pedal counts as pressed above this, as released below the other.
+	constexpr float PedalPressed = 0.5f;
+	constexpr float PedalReleased = 0.05f;
+
 	UInputAction* MakeButtonAction(UObject* Outer, FName Name)
 	{
 		UInputAction* Action = NewObject<UInputAction>(Outer, Name);
@@ -166,6 +175,8 @@ void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
 	Chassis->SetMassOverrideInKg(NAME_None, Params.mass, true);
 	Sim->Restart(Chassis, Params);
 	PlaceMeshes(Data);
+	bReverse = false;
+	StandingOnBrake = 0.f;
 	WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 	if (LapTimer)
 	{
@@ -205,7 +216,7 @@ void AGTOVehiclePawn::PlaceMeshes(const UGTOVehicleDataAsset& Data)
 void AGTOVehiclePawn::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	LastInput = ScriptedInput ? *ScriptedInput : ReadDriverInput();
+	LastInput = ScriptedInput ? *ScriptedInput : ReadDriverInput(DeltaSeconds);
 	Sim->QueueInput(LastInput);
 
 	if (LapTimer)
@@ -248,8 +259,9 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	// Default layout, created in code so it stays readable and reviewable. Keyboard and gamepad are mapped side by side
-	// and both work at any time; for now their values go straight to the sim.
+	// and both work at any time; the adapter smooths their values (input smoothing of the physics package).
 	UInputAction* ResetAction = MakeButtonAction(this, TEXT("IA_Reset"));
+	UInputAction* TractionControlAction = MakeButtonAction(this, TEXT("IA_ToggleTractionControl"));
 	UInputAction* TelemetryAction = MakeButtonAction(this, TEXT("IA_ToggleTelemetry"));
 	UInputAction* QuitAction = MakeButtonAction(this, TEXT("IA_Quit"));
 	SteerAction = MakeAxisAction(this, TEXT("IA_Steer"), EInputActionAccumulationBehavior::Cumulative); // left and right keys cancel out
@@ -276,6 +288,8 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	InputMapping->MapKey(HandbrakeAction, EKeys::Gamepad_FaceButton_Bottom);
 	InputMapping->MapKey(ResetAction, EKeys::R);
 	InputMapping->MapKey(ResetAction, EKeys::Gamepad_FaceButton_Top);
+	InputMapping->MapKey(TractionControlAction, EKeys::C);
+	InputMapping->MapKey(TractionControlAction, EKeys::Gamepad_DPad_Up);
 	InputMapping->MapKey(TelemetryAction, EKeys::T);
 	InputMapping->MapKey(TelemetryAction, EKeys::Gamepad_Special_Left);
 	InputMapping->MapKey(QuitAction, EKeys::Escape);
@@ -283,6 +297,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(PlayerInputComponent);
 	Input->BindAction(ResetAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ResetToStart);
+	Input->BindAction(TractionControlAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleTractionControl);
 	Input->BindAction(TelemetryAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleTelemetry);
 	Input->BindAction(QuitAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::Quit);
 	for (const UInputAction* Action : { SteerAction.Get(), ThrottleAction.Get(), BrakeAction.Get(), HandbrakeAction.Get() })
@@ -299,7 +314,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	}
 }
 
-FGTODriverInput AGTOVehiclePawn::ReadDriverInput() const
+FGTODriverInput AGTOVehiclePawn::ReadDriverInput(float DeltaSeconds)
 {
 	FGTODriverInput Driver;
 	const UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent);
@@ -308,11 +323,37 @@ FGTODriverInput AGTOVehiclePawn::ReadDriverInput() const
 		return Driver; // not driven by a player
 	}
 	const auto Value = [Input](const UInputAction* Action) { return Input->GetBoundActionValue(Action).Get<float>(); };
+	const float Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
+	const float Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
+
+	// Brake to reverse, as in most racing games with an automatic: holding the brake at a standstill engages reverse,
+	// pressing the throttle at a standstill engages drive again.
+	const FGTOChassisKinematics Motion = Sim->GetLatestState().Chassis;
+	const double ForwardSpeed = Motion.Orientation.UnrotateVector(Motion.LinearVelocity).X; // m/s
+	const bool bStanding = FMath::Abs(ForwardSpeed) < StandstillSpeed;
+	StandingOnBrake = bStanding && Brake > PedalPressed && Throttle < PedalReleased ? StandingOnBrake + DeltaSeconds : 0.f;
+	if (!bReverse && StandingOnBrake >= ReverseAfter)
+	{
+		bReverse = true;
+	}
+	else if (bReverse && bStanding && Throttle > PedalPressed && Brake < PedalReleased)
+	{
+		bReverse = false;
+	}
+
 	Driver.Steer = FMath::Clamp(Value(SteerAction), -1.f, 1.f);
-	Driver.Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
-	Driver.Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
+	Driver.Throttle = bReverse ? Brake : Throttle;
+	Driver.Brake = bReverse ? Throttle : Brake;
 	Driver.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
+	Driver.GearRequest = bReverse ? -1 : 1;
+	Driver.TractionControl = TractionControl;
+	Driver.bHuman = true;
 	return Driver;
+}
+
+void AGTOVehiclePawn::ToggleTractionControl()
+{
+	TractionControl = TractionControl > 0 ? 0 : DefaultTractionControl;
 }
 
 void AGTOVehiclePawn::ToggleTelemetry()

@@ -398,6 +398,114 @@ namespace
 		double TopSpeed = 0.0;
 	};
 
+	/**
+	 * Settled car → throttle to speed → steer left, as a player through the input smoothing: turns left, in yaw rate and
+	 * course. A swapped axis in the adapter turns it right.
+	 */
+	class FSteersLeftRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		static constexpr double SettleSeconds = 1.0;
+		static constexpr double AccelerateSeconds = 3.0;
+		static constexpr double SteerSeconds = 2.0;
+
+		virtual bool Step(uint32 Ticks) override
+		{
+			FGTODriverInput Input;
+			Input.bHuman = true;
+			const FGTOChassisKinematics Chassis = Sim()->GetLatestState().Chassis;
+			if (Ticks < TicksFor(SettleSeconds))
+			{
+				Vehicle->SetScriptedInput(Input);
+				return false;
+			}
+			Input.Throttle = 0.5f;
+			if (Ticks < TicksFor(SettleSeconds + AccelerateSeconds))
+			{
+				SteerStart = Chassis;
+			}
+			else if (Ticks < TicksFor(SettleSeconds + AccelerateSeconds + SteerSeconds))
+			{
+				Input.Steer = -0.5f;
+				MinYawRate = FMath::Min(MinYawRate, Chassis.AngularVelocity.Z);
+			}
+			else
+			{
+				Vehicle->SetScriptedInput({});
+				Check(Chassis);
+				return true;
+			}
+			Vehicle->SetScriptedInput(Input);
+			return false;
+		}
+
+		void Check(const FGTOChassisKinematics& Chassis)
+		{
+			const FVector Heading = SteerStart.Orientation.GetForwardVector();
+			const FVector Right = SteerStart.Orientation.GetRightVector();
+			const FVector Travel = Chassis.Position - SteerStart.Position; // m
+			const double Aside = FVector::DotProduct(Travel, Right);         // positive to the right
+			const double Turned = FRotator::NormalizeAxis(Chassis.Orientation.Rotator().Yaw - SteerStart.Orientation.Rotator().Yaw); // deg
+
+			Test.AddInfo(FString::Printf(TEXT("from %.2f m/s: turned %.1f deg, %.2f m ahead and %.2f m to the right, yaw rate down to %.3f rad/s"),
+				SteerStart.LinearVelocity.Size(), Turned, FVector::DotProduct(Travel, Heading), Aside, MinYawRate));
+			Test.TestTrue(FString::Printf(TEXT("at speed when steering (%.2f m/s)"), SteerStart.LinearVelocity.Size()), SteerStart.LinearVelocity.Size() > 5.0);
+			Test.TestTrue(FString::Printf(TEXT("yaws to the left (%.3f rad/s, negative is left)"), MinYawRate), MinYawRate < -0.1);
+			Test.TestTrue(FString::Printf(TEXT("heading turned to the left (%.1f deg)"), Turned), Turned < -10.0);
+			Test.TestTrue(FString::Printf(TEXT("course off to the left (%.2f m)"), Aside), Aside < -1.0);
+		}
+
+		FGTOChassisKinematics SteerStart;
+		double MinYawRate = 0.0;
+	};
+
+	/** Settled car → reverse gear and throttle → drives backwards. */
+	class FReversesRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		static constexpr double SettleSeconds = 1.0;
+		static constexpr double ReverseSeconds = 3.0;
+
+		virtual bool Step(uint32 Ticks) override
+		{
+			const FGTOVehicleState State = Sim()->GetLatestState();
+			FGTODriverInput Input;
+			if (Ticks < TicksFor(SettleSeconds))
+			{
+				SettledAt = State.Chassis.Position;
+			}
+			else if (Ticks < TicksFor(SettleSeconds + ReverseSeconds))
+			{
+				Input.GearRequest = -1;
+				Input.Throttle = 0.5f;
+				MinGear = FMath::Min(MinGear, State.Gear);
+			}
+			else
+			{
+				Vehicle->SetScriptedInput({});
+				const FVector Heading = Start.GetRotation().GetForwardVector();
+				const double Moved = FVector::DotProduct(State.Chassis.Position - SettledAt, Heading); // m
+				const double Speed = FVector::DotProduct(State.Chassis.LinearVelocity, Heading);      // m/s
+				Test.AddInfo(FString::Printf(TEXT("in gear %d: moved %.2f m along the heading at %.2f m/s"), MinGear, Moved, Speed));
+				Test.TestEqual(TEXT("in reverse"), MinGear, -1);
+				Test.TestTrue(FString::Printf(TEXT("drives backwards (%.2f m)"), Moved), Moved < -2.0);
+				Test.TestTrue(FString::Printf(TEXT("still rolling backwards (%.2f m/s)"), Speed), Speed < -1.0);
+				return true;
+			}
+			Vehicle->SetScriptedInput(Input);
+			return false;
+		}
+
+		FVector SettledAt = FVector::ZeroVector;
+		int32 MinGear = 0;
+	};
+
 	/** Friction of one of the test track's physical materials, e.g. "PM_Grass". */
 	double SurfaceFriction(const TCHAR* Name)
 	{
@@ -741,6 +849,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOResetPutsCarOnStartTest, "GTO.Smoke.ResetPu
 bool FGTOResetPutsCarOnStartTest::RunTest(const FString& Parameters)
 {
 	PlayMap<FResetRun>(*this, FlatTestMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOSteersLeftTest, "GTO.Smoke.SteersLeft", SmokeTestFlags)
+
+bool FGTOSteersLeftTest::RunTest(const FString& Parameters)
+{
+	PlayMap<FSteersLeftRun>(*this, FlatTestMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOReversesTest, "GTO.Smoke.Reverses", SmokeTestFlags)
+
+bool FGTOReversesTest::RunTest(const FString& Parameters)
+{
+	PlayMap<FReversesRun>(*this, FlatTestMap);
 	return true;
 }
 

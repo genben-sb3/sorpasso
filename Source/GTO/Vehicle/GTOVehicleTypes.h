@@ -23,11 +23,13 @@ inline bool GTOIsLeft(EGTOWheel Wheel) { return Wheel == EGTOWheel::FrontLeft ||
 /** What the driver asks for on one frame, before the adapter turns it into the physics package's input packet. */
 struct FGTODriverInput
 {
-	float Steer = 0.f;     // -1 (left) … 1 (right)
-	float Throttle = 0.f;  // 0 … 1
-	float Brake = 0.f;     // 0 … 1
-	float Handbrake = 0.f; // 0 … 1
-	int8 GearRequest = 1;  // -1 reverse, 0 neutral, 1 … n forward gears
+	float Steer = 0.f;         // -1 (left) … 1 (right)
+	float Throttle = 0.f;      // 0 … 1
+	float Brake = 0.f;         // 0 … 1
+	float Handbrake = 0.f;     // 0 … 1
+	int8 GearRequest = 1;      // -1 reverse, 0 neutral, 1 drive (the automatic picks the forward gear)
+	int32 TractionControl = 0; // level 0 (off) … 5
+	bool bHuman = false;       // from keyboard or gamepad: goes through the input smoothing; test drivers do not
 };
 
 /** Chassis rigid-body state in world space. Position is the centre of mass. */
@@ -57,4 +59,6 @@ struct FGTOVehicleState
 {
 	FGTOChassisKinematics Chassis; // the kinematics the last step was computed from
 	TStaticArray<FGTOWheelState, GTONumWheels> Wheels;
+	int32 Gear = 0;           // -1 reverse, 0 neutral, 1 … n forward gears
+	double EngineSpeed = 0.0; // rad/s
 };

@@ -22,6 +22,8 @@ FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVeh
 		Wheel.LateralForce = FMath::Lerp(A.LateralForce, B.LateralForce, Alpha);
 		Wheel.SurfaceFriction = Alpha < 0.5 ? A.SurfaceFriction : B.SurfaceFriction;
 	}
+	Result.Gear = Alpha < 0.5 ? From.Gear : To.Gear;
+	Result.EngineSpeed = FMath::Lerp(From.EngineSpeed, To.EngineSpeed, Alpha);
 	return Result;
 }
 
