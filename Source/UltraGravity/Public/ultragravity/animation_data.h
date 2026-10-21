@@ -2,6 +2,8 @@
 
 #include <array>
 
+#include "ultragravity/export.h"
+
 namespace ultragravity {
 
 inline constexpr int wheel_count = 4; // API
@@ -20,12 +22,12 @@ struct AnimationData {
 };
 
 // Wraps an angle into [-π, π).
-double wrap_angle(double angle);
+UG_API double wrap_angle(double angle);
 
 // Value between two consecutive ticks for arbitrary frame rates.
 // fraction 0 yields exactly a, fraction 1 exactly b; in between it blends linearly.
 // The wheel angle takes the short way across the wrap at ±π (a wheel
 // turns less than half a revolution per tick).
-AnimationData interpolate(const AnimationData& a, const AnimationData& b, double fraction);
+UG_API AnimationData interpolate(const AnimationData& a, const AnimationData& b, double fraction);
 
 } // namespace ultragravity

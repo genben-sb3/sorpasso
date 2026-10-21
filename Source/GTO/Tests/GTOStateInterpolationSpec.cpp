@@ -1,5 +1,5 @@
 #include "Misc/AutomationTest.h"
-#include "GTOStateInterpolation.h"
+#include "Vehicle/GTOStateInterpolation.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -21,7 +21,7 @@ namespace
 	}
 }
 
-BEGIN_DEFINE_SPEC(FGTOStateInterpolationSpec, "GTO.Sim.Interpolation", EAutomationTestFlags::ProductFilter | EAutomationTestFlags_ApplicationContextMask)
+BEGIN_DEFINE_SPEC(FGTOStateInterpolationSpec, "GTO.Vehicle.Interpolation", EAutomationTestFlags::ProductFilter | EAutomationTestFlags_ApplicationContextMask)
 	FGTOSnapshotInterpolator Display;
 
 	// One frame as the adapter runs it: the snapshots of the frame's sim steps, then the frame time. Returns the shown X.

@@ -1,16 +1,17 @@
 #pragma once
 
-#include "GTOVehicleState.h"
+#include "CoreMinimal.h"
+#include "Vehicle/GTOVehicleTypes.h"
 
 /** Blends two snapshots: Alpha 0 gives From, 1 gives To. Orientation follows the shortest arc. */
-GTOSIM_API FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVehicleState& To, double Alpha);
+GTO_API FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVehicleState& To, double Alpha);
 
 /**
  * Display state between the last two sim snapshots. The display runs one sim step behind the latest snapshot and
  * follows frame time in between, so it moves smoothly while the sim steps at a fixed rate. Per frame: Push every
  * snapshot the frame's sim steps produced, then Advance by the frame time, then Sample.
  */
-class GTOSIM_API FGTOSnapshotInterpolator
+class GTO_API FGTOSnapshotInterpolator
 {
 public:
 	explicit FGTOSnapshotInterpolator(double InStepDt = 1.0 / 120.0);

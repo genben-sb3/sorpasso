@@ -27,6 +27,6 @@ cmake --build build --target ultragravity_physics
 
 - `physics/`: CMake-Ziel des Physikpakets (Quellen im Unreal-Modul `../Source/UltraGravity/`), nur Standardbibliothek, ohne Exceptions und RTTI
 - `test_world/`: Ersatz für Unreal: starrer Körper, Testgelände, Radkontakte
-- `vehicles/`: Fahrzeugdateien
 - `tests/`: doctest-Tests an den Nähten aus der Spec
+- Fahrzeugdateien: im Spiel unter `../Content/VehicleFiles/`, damit sie beim Packen mitkommen (ADR 0010)
 - `third_party/`: doctest 2.4.11 (Header plus `cmake/` für `doctest_discover_tests`); nlohmann/json 3.11.3 liegt im Modul unter `../Source/UltraGravity/ThirdParty/`

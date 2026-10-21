@@ -82,15 +82,28 @@ TEST_CASE("The vehicle step yields the same output for the same input") {
     }
 }
 
+namespace {
+
+// Tires with a long relaxation length: the lag then spans many ticks even at a speed
+// at which it acts fully (ADR 0002).
+VehicleParams with_long_relaxation() {
+    VehicleParams params = sports_coupe();
+    params.front.tire.relaxation_length = 1.5;
+    params.rear.tire.relaxation_length = 1.5;
+    return params;
+}
+
+} // namespace
+
 TEST_CASE("The lateral force builds up over the relaxation length") {
-    const VehicleParams params = sports_coupe();
+    const VehicleParams params = with_long_relaxation();
     const double sigma = params.front.tire.relaxation_length; // m
-    REQUIRE(params.rear.tire.relaxation_length == sigma);
 
     // The body slides at 1° slip angle, just fast enough to roll one relaxation
     // length in 15 ticks. At 1° the tire is almost linear.
     const double ticks_per_sigma = 15.0; // ticks per relaxation length
     const double vx = sigma * 120.0 / ticks_per_sigma; // m/s
+    REQUIRE(vx > 10.0);
     BodyMotion body;
     body.position = {0.0, 0.0, 0.5};
     body.velocity = {vx, -vx * std::tan(std::numbers::pi / 180.0), 0.0};
@@ -101,12 +114,13 @@ TEST_CASE("The lateral force builds up over the relaxation length") {
     REQUIRE(steady > 0.0);
 
     // First-order lag over the rolled distance: 1 − e^(−s/σ).
-    CHECK(force[0] < 0.2 * steady); // measured: 0.038·steady, band: < 0.2·steady
-    CHECK(force[14] / steady == doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.05)); // measured: +0.68 %, band: ±5 %
-    CHECK(force[44] / steady == doctest::Approx(1.0 - std::exp(-3.0)).epsilon(0.02)); // measured: +0.23 %, band: ±2 %
+    CHECK(force[0] < 0.2 * steady); // measured: 0.039·steady, band: < 0.2·steady
+    CHECK(force[14] / steady == doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.05)); // measured: +1.07 %, band: ±5 %
+    CHECK(force[44] / steady == doctest::Approx(1.0 - std::exp(-3.0)).epsilon(0.02)); // measured: +0.29 %, band: ±2 %
 }
 
-TEST_CASE("The lateral force builds up at standstill too, via a lower bound on the speed") {
+TEST_CASE("At standstill the slip angle acts at once, without the relaxation lag") {
+    // ADR 0002: with the lag the tire would be a hardly damped spring at standstill.
     const VehicleParams params = sports_coupe();
     BodyMotion body;
     body.position = {0.0, 0.0, 0.5};
@@ -117,20 +131,18 @@ TEST_CASE("The lateral force builds up at standstill too, via a lower bound on t
     CAPTURE(steady);
     REQUIRE(steady > 0.0);
 
-    // Without the lower bound the force would stay at zero at standstill; with it
-    // it builds up with a lag, but completely.
-    CHECK(force[0] < 0.5 * steady); // measured: 0.016·steady, band: < 0.5·steady
-    CHECK(force[119] > 0.95 * steady); // measured: 0.97·steady, band: > 0.95·steady
+    CHECK(force[0] == doctest::Approx(steady).epsilon(0.01)); // measured: equal to 6 digits, band: ±1 %
 }
 
 TEST_CASE("At a large slip angle the full sliding speed counts for the relaxation") {
-    const VehicleParams params = sports_coupe();
+    const VehicleParams params = with_long_relaxation();
     const double sigma = params.front.tire.relaxation_length; // m
 
     // The body slides at 30°, fast enough to cover one relaxation length in 15
     // ticks. Longitudinally alone it would be only 0.87 of that.
     const double speed = sigma * 120.0 / 15.0;               // m/s
     const double angle = 30.0 * std::numbers::pi / 180.0;    // rad
+    REQUIRE(speed * std::cos(angle) > 10.0);
     BodyMotion body;
     body.position = {0.0, 0.0, 0.5};
     body.velocity = {speed * std::cos(angle), -speed * std::sin(angle), 0.0};
@@ -142,7 +154,7 @@ TEST_CASE("At a large slip angle the full sliding speed counts for the relaxatio
 
     // Over the sliding distance 1 − e^(−s/σ); over the longitudinal distance it would be
     // only 1 − e^(−0.87) = 0.58 after one relaxation length.
-    // measured: -0.0005 %, band: ±3 %
+    // measured: -0.00006 %, band: ±3 %
     CHECK(ticks[14].state.slip_angle[rear_left] / steady ==
           doctest::Approx(1.0 - std::exp(-1.0)).epsilon(0.03));
 }

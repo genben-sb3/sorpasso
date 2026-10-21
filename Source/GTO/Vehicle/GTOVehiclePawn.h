@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Game/GTOLapTimer.h"
 #include "GameFramework/Pawn.h"
-#include "GTOVehicleTypes.h"
+#include "Vehicle/GTOVehicleTypes.h"
 #include "GTOVehiclePawn.generated.h"
 
 class UBoxComponent;
@@ -27,27 +27,30 @@ class GTO_API AGTOVehiclePawn : public APawn
 public:
 	AGTOVehiclePawn();
 
-	/** Vehicle parameters and meshes, read again on every reset. Without an asset the class defaults apply. */
+	/**
+	 * Meshes and vehicle file, read again on every reset. Without an asset the class defaults apply. If the vehicle file
+	 * cannot be loaded when the car spawns, the error goes to the log and the car destroys itself.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Vehicle")
 	TObjectPtr<UGTOVehicleDataAsset> VehicleData;
 
-	/** Puts the car back on the start point, level and facing the start direction, at rest with fresh parameters. */
+	/** Puts the car back on the start point, level and facing the start direction, at rest with a fresh vehicle file. */
 	UFUNCTION(BlueprintCallable, Category = "Vehicle")
 	void ResetToStart();
 
 	/**
-	 * Puts the car on the ground below Transform, level and facing its yaw, at rest with fresh parameters. The lap in
-	 * progress no longer counts.
+	 * Puts the car on the ground below Transform, level and facing its yaw, at rest with a fresh vehicle file. The lap in
+	 * progress no longer counts. A vehicle file that fails to load keeps the previous one.
 	 */
 	void ResetTo(const FTransform& Transform);
 
 	const UGTOVehicleSimComponent* GetSim() const { return Sim; }
 
-	/** Drives the car with Packet instead of the player's controls, e.g. in tests; unset hands control back. */
-	void SetScriptedInput(const TOptional<FGTOInputPacket>& Packet) { ScriptedInput = Packet; }
+	/** Drives the car with Input instead of the player's controls, e.g. in tests; unset hands control back. */
+	void SetScriptedInput(const TOptional<FGTODriverInput>& Input) { ScriptedInput = Input; }
 
-	/** Controls sent to the sim on the last frame. */
-	const FGTOInputPacket& GetLastInput() const { return LastInput; }
+	/** Driver input sent to the sim on the last frame. */
+	const FGTODriverInput& GetLastInput() const { return LastInput; }
 
 	/** Session lap times, or null on a map without a start-finish line. */
 	const FGTOLapTimer* GetLapTimer() const { return LapTimer.GetPtrOrNull(); }
@@ -59,8 +62,9 @@ public:
 private:
 	const UGTOVehicleDataAsset& GetVehicleData() const;
 	void ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data);
+	void PlaceMeshes(const UGTOVehicleDataAsset& Data);
 	void UpdateDisplay();
-	FGTOInputPacket ReadDriverInput() const;
+	FGTODriverInput ReadDriverInput() const;
 	void ToggleTelemetry();
 	void Quit();
 
@@ -106,8 +110,8 @@ private:
 
 	FTransform StartTransform;
 	TOptional<FGTOLapTimer> LapTimer;
-	TOptional<FGTOInputPacket> ScriptedInput;
-	FGTOInputPacket LastInput;
+	TOptional<FGTODriverInput> ScriptedInput;
+	FGTODriverInput LastInput;
 
 	/** Display only: how far each wheel has turned, in EGTOWheel order (rad). */
 	TStaticArray<double, GTONumWheels> WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);

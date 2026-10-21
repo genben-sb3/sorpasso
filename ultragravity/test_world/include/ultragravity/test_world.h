@@ -38,6 +38,12 @@ public:
 
     void tick(const InputPacket& input);
 
+    // A shove: changes the velocity and angular velocity of the body at once, as an impulse would.
+    void push(Vec3 velocity_change, Vec3 angular_velocity_change = {}) {
+        body_.velocity += velocity_change;
+        body_.angular_velocity += angular_velocity_change;
+    }
+
     const BodyMotion& body() const { return body_; }
     const StepResult& last_step() const { return last_step_; }
     std::uint64_t checksum() const;

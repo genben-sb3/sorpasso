@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "ultragravity/export.h"
 #include "ultragravity/vector_math.h"
 
 namespace ultragravity {
@@ -162,10 +163,10 @@ struct LoadResult {
 // itself (the Unreal adapter uses Unreal's file access). Same checks, field
 // paths and messages as load_vehicle_file. Invalid JSON yields an error with
 // line and column. Throws no exceptions.
-LoadResult parse_vehicle_file(std::string_view json);
+UG_API LoadResult parse_vehicle_file(std::string_view json);
 
 // Loads a vehicle file from disk; reads the file and hands the text to
 // parse_vehicle_file. Throws no exceptions.
-LoadResult load_vehicle_file(const std::string& path);
+UG_API LoadResult load_vehicle_file(const std::string& path);
 
 } // namespace ultragravity

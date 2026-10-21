@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "drive.h"
 #include "ultragravity/test_world.h"
 
 using namespace ultragravity;
@@ -86,6 +87,54 @@ TEST_CASE("At standstill the axle loads match the static distribution") {
     CHECK(wheel_load[rear_left] == doctest::Approx(wheel_load[rear_right]).epsilon(0.01));
 }
 
+TEST_CASE("A car pushed sideways at standstill comes to rest without swinging back") {
+    // The worry of ADR 0002: with the relaxation lag the tire acts like a spring at standstill,
+    // and the shoved car slides back towards where it stood. Watched at the ground below the
+    // center of mass, so the body rolling back upright on its springs does not count.
+    TestWorld world(sports_coupe(), 0.02);
+    std::uint32_t tick = 0;
+    stand(world, tick, 3.0);
+    const double height = world.body().position.z; // m, center of mass above the ground
+    world.push({0.0, 0.5, 0.0}); // m/s to the left
+
+    double lowest_side_speed = 0.0; // m/s at the ground, negative back towards where it stood
+    for (int i = 0; i < 2 * 120; ++i) {
+        stand(world, tick, TestWorld::time_step);
+        const BodyMotion& b = world.body();
+        const Vec3 ground = b.velocity + cross(b.angular_velocity, rotate(b.orientation, {0.0, 0.0, -height}));
+        lowest_side_speed = std::min(lowest_side_speed, ground.y);
+    }
+    double largest_rest_speed = 0.0; // m/s
+    for (int i = 0; i < 120; ++i) {
+        stand(world, tick, TestWorld::time_step);
+        largest_rest_speed = std::max(largest_rest_speed, length(world.body().velocity));
+    }
+
+    // The little backward speed comes from the body rolling back upright on its dampers,
+    // with the tire yielding as a damper; a tire that springs back reaches -0.23 m/s.
+    CHECK(lowest_side_speed > -0.02); // measured: -0.0102 m/s, band: > -2 cm/s
+    CHECK(largest_rest_speed < 1e-3); // measured: 1.5e-5 m/s, band: < 1 mm/s
+}
+
+TEST_CASE("A car turned at standstill stops turning without its yaw rate flipping from tick to tick") {
+    // At standstill the tire is a stiff damper (ADR 0002). Against a yaw rate fixed over
+    // the whole tick it would overshoot and flip the yaw rate every tick.
+    TestWorld world(sports_coupe(), 0.02);
+    std::uint32_t tick = 0;
+    stand(world, tick, 3.0);
+    world.push({}, {0.0, 0.0, 0.05}); // rad/s
+
+    test::OscillationDetector yaw_rate(1e-6); // rad/s per tick
+    for (int i = 0; i < 120; ++i) {
+        stand(world, tick, TestWorld::time_step);
+        yaw_rate.add(world.body().angular_velocity.z);
+    }
+    CAPTURE(world.body().angular_velocity.z);
+
+    CHECK(yaw_rate.longest_run() < 3); // measured: 0 (118 with the yaw rate fixed over the tick), band: < 3
+    CHECK(std::abs(world.body().angular_velocity.z) < 1e-4); // measured: 4e-12 rad/s, band: < 1e-4 rad/s
+}
+
 TEST_CASE("Two runs with the same input packets yield the same checksum") {
     TestWorld first_run(sports_coupe(), 0.10);
     TestWorld second_run(sports_coupe(), 0.10);
@@ -102,3 +151,4 @@ TEST_CASE("Two runs with the same input packets yield the same checksum") {
     stand(first_run, tick_first, TestWorld::time_step);
     CHECK(first_run.checksum() != second_run.checksum());
 }
+

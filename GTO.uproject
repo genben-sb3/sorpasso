@@ -10,7 +10,7 @@
 			"LoadingPhase": "Default"
 		},
 		{
-			"Name": "GTOSim",
+			"Name": "UltraGravity",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}

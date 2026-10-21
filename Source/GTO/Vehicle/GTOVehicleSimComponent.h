@@ -2,20 +2,25 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "GTOInputQueue.h"
-#include "GTOStateInterpolation.h"
-#include "GTOVehicleParams.h"
-#include "GTOVehicleState.h"
 #include "HAL/CriticalSection.h"
 #include "PhysicsEngine/BodyInstance.h"
+#include "ultragravity/vehicle_file.h"
+#include "ultragravity/vehicle_step.h"
+#include "Vehicle/GTOInputQueue.h"
+#include "Vehicle/GTOStateInterpolation.h"
+#include "Vehicle/GTOVehicleTypes.h"
 #include "GTOVehicleSimComponent.generated.h"
 
 class UPrimitiveComponent;
 
 /**
- * Unreal adapter of the sim core (ADR 0001). In the async physics tick of every Chaos step it casts one sphere per
- * wheel, runs the sim core in substeps against those contacts and applies the averaged forces to the chassis body.
- * Input arrives as packets through a queue; the game thread reads the results only as copied snapshots.
+ * The adapter between Unreal and the physics package (ADR 0001). In the async physics tick of every Chaos step it sweeps
+ * one wheel-sized sphere along each probe ray of the package, runs the vehicle step against those wheel contacts and
+ * applies the forces, averaged over the package's substeps, to the chassis body. Input arrives through a queue; the
+ * game thread reads the results only as copied snapshots.
+ *
+ * The only place that converts between Unreal (cm, Y right, left-handed) and the package (SI, ISO 8855: Y left).
+ * Everything it hands out is in metres with Unreal axes.
  */
 UCLASS(ClassGroup = (GTO), meta = (BlueprintSpawnableComponent))
 class GTO_API UGTOVehicleSimComponent : public UActorComponent
@@ -25,25 +30,37 @@ class GTO_API UGTOVehicleSimComponent : public UActorComponent
 public:
 	UGTOVehicleSimComponent();
 
-	/** Sim core substeps per Chaos step. */
-	UPROPERTY(EditAnywhere, Category = "Simulation", meta = (ClampMin = 1))
-	int32 NumSubsteps = 8;
-
-	/** Trace channel of the wheel casts. */
+	/** Trace channel of the wheel sweeps. */
 	UPROPERTY(EditAnywhere, Category = "Simulation")
 	TEnumAsByte<ECollisionChannel> WheelTraceChannel = ECC_Visibility;
 
-	/** Starts simulating Body with InParams from its current pose, wheels unloaded. Game thread. */
-	void Restart(UPrimitiveComponent* Body, const FGTOVehicleParams& InParams);
+	/** Starts simulating Body with InParams from its current pose, at rest with the engine idling. Game thread. */
+	void Restart(UPrimitiveComponent* Body, const ultragravity::VehicleParams& InParams);
 
-	/** Queues controls for the next sim tick. Game thread. */
-	void QueueInput(FGTOInputPacket Packet);
+	/** Queues driver input for the next sim tick. Game thread. */
+	void QueueInput(const FGTODriverInput& Input);
 
-	FGTOVehicleParams GetParams() const;
+	/** False until the first Restart. */
+	bool HasParams() const;
+
+	/** kg */
+	double GetMass() const;
+
+	/** Height of the centre of mass above flat ground with the car level and every wheel hanging at full droop (m). */
+	static double FullDroopHeight(const ultragravity::VehicleParams& Params);
+
+	/** Centre of a wheel compressed by Compression (m), relative to the centre of mass in chassis axes (m). */
+	FVector GetWheelCentre(EGTOWheel Wheel, double Compression) const;
+
+	/** m */
+	double GetWheelRadius(EGTOWheel Wheel) const;
+
+	/** Origin of the vehicle file's frame relative to the centre of mass, in chassis axes (m). */
+	FVector GetVehicleFrameOrigin() const;
 
 	/**
-	 * Snapshot after the last completed Chaos step: the chassis as Chaos left it, the wheels as the sim core left them.
-	 * OutSimTime receives the sim time of the snapshot (s): fixed steps since the component started, across restarts.
+	 * Snapshot after the last completed Chaos step: the chassis as Chaos left it, the wheels as the physics package left
+	 * them. OutSimTime receives the sim time of the snapshot (s): fixed steps since the component started, across restarts.
 	 */
 	FGTOVehicleState GetLatestState(double* OutSimTime = nullptr) const;
 
@@ -60,8 +77,7 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
-	FGTOChassisKinematics ReadChassis(FBodyInstanceAsyncPhysicsTickHandle& Handle) const;
-	FGTOWheelContacts CastWheels(const FGTOChassisKinematics& Chassis) const;
+	ultragravity::WheelContacts SweepWheels(const ultragravity::BodyMotion& Body) const;
 	void ApplyMassProperties(FBodyInstanceAsyncPhysicsTickHandle& Handle) const;
 
 	UPROPERTY()
@@ -71,8 +87,10 @@ private:
 
 	// Shared between the async physics tick and the game thread.
 	mutable FCriticalSection Lock;
-	FGTOVehicleParams Params;
-	FGTOVehicleState State;  // carried from step to step
+	bool bHasParams = false;
+	ultragravity::VehicleParams Params;
+	ultragravity::State State; // carried from step to step
+	TStaticArray<FGTOWheelState, GTONumWheels> Wheels; // as the last step left them
 	FGTOVehicleState Latest; // see GetLatestState
 	double LatestSimTime = 0.0;
 	double NextSimTime = 0.0;

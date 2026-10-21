@@ -1,4 +1,4 @@
-#include "GTOStateInterpolation.h"
+#include "Vehicle/GTOStateInterpolation.h"
 
 FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVehicleState& To, double Alpha)
 {
@@ -20,6 +20,7 @@ FGTOVehicleState GTOInterpolateState(const FGTOVehicleState& From, const FGTOVeh
 		Wheel.SlipAngle = FMath::Lerp(A.SlipAngle, B.SlipAngle, Alpha);
 		Wheel.LongitudinalForce = FMath::Lerp(A.LongitudinalForce, B.LongitudinalForce, Alpha);
 		Wheel.LateralForce = FMath::Lerp(A.LateralForce, B.LateralForce, Alpha);
+		Wheel.SurfaceFriction = Alpha < 0.5 ? A.SurfaceFriction : B.SurfaceFriction;
 	}
 	return Result;
 }

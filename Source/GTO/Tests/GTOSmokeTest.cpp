@@ -2,14 +2,18 @@
 #include "Tests/AutomationCommon.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
-#include "GTOHeadlessHarness.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "Track/GTOStartFinishLine.h"
 #include "Track/GTOTestTrack.h"
 #include "Vehicle/GTOVehiclePawn.h"
 #include "Vehicle/GTOUnits.h"
+#include "Vehicle/GTOVehicleDataAsset.h"
 #include "Vehicle/GTOVehicleSimComponent.h"
+#include "ultragravity/test_world.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
@@ -18,8 +22,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 // In-engine smoke tests. On the flat test map they check only that adapter and Chaos work together (async tick,
-// wheel casts, forces, input packets); on the test track, that the car starts at the line, feels the surfaces, rides
-// over curbs and is timed. They watch the car through its sim snapshots, with rough tolerances.
+// wheel sweeps, forces, units and axes, input); on the test track, that the car starts at the line, feels the surfaces,
+// rides over curbs and is timed. They watch the car through its sim snapshots, with rough tolerances. The physics
+// itself is tested in the physics package's CMake project.
 namespace
 {
 	const TCHAR* FlatTestMap = TEXT("/Game/Maps/FlatTest");
@@ -27,24 +32,33 @@ namespace
 
 	constexpr double TimeoutSeconds = 60.0;
 
-	/** Static wheel loads of the car on flat ground, settled in the headless harness stepped like the adapter. */
-	TStaticArray<double, GTONumWheels> HarnessStaticLoads(const FGTOVehicleParams& Params, double FixedStep, int32 NumSubsteps)
+	/** Static wheel loads of the car on flat ground, settled for 5 s in the physics package's test world. */
+	TStaticArray<double, GTONumWheels> TestWorldStaticLoads(const ultragravity::VehicleParams& Params)
 	{
-		const FGTOFlatGround Ground;
-		FGTOChassisKinematics Start;
-		Start.Position.Z = Ground.Height + Params.FullDroopHeight();
-		FGTOHeadlessHarness Harness(Params, Ground, Start, FixedStep, NumSubsteps);
-		for (int32 Tick = 0; Tick < FMath::RoundToInt32(5.0 / FixedStep); ++Tick)
+		ultragravity::TestWorld World(Params, 0.02);
+		for (int32 Tick = 0; Tick < FMath::RoundToInt32(5.0 / ultragravity::TestWorld::time_step); ++Tick)
 		{
-			Harness.Tick();
+			World.tick(ultragravity::InputPacket());
 		}
 
 		TStaticArray<double, GTONumWheels> Loads;
 		for (int32 Index = 0; Index < GTONumWheels; ++Index)
 		{
-			Loads[Index] = Harness.State().Wheels[Index].Load;
+			Loads[Index] = World.last_step().telemetry.wheel_load[Index];
 		}
 		return Loads;
+	}
+
+	/** The car's vehicle params, as its vehicle file says. */
+	ultragravity::VehicleParams LoadParams(const AGTOVehiclePawn& Vehicle, FAutomationTestBase& Test)
+	{
+		ultragravity::VehicleParams Params;
+		FString Error;
+		if (!Vehicle.VehicleData || !Vehicle.VehicleData->LoadVehicleParams(Params, Error))
+		{
+			Test.AddError(FString::Printf(TEXT("the car's vehicle file does not load: %s"), *Error));
+		}
+		return Params;
 	}
 
 	/** Finds the player's car once the map plays and measures time in sim ticks. Update() returns true when done. */
@@ -140,22 +154,21 @@ namespace
 
 		void Check(const FGTOVehicleState& State)
 		{
-			const FGTOVehicleParams Params = Sim()->GetParams();
 			const double FixedStep = UPhysicsSettings::Get()->AsyncFixedTimeStepSize;
-			const TStaticArray<double, GTONumWheels> Expected = HarnessStaticLoads(Params, FixedStep, Sim()->NumSubsteps);
-			const double Weight = Params.Mass * Gravity;
+			const TStaticArray<double, GTONumWheels> Expected = TestWorldStaticLoads(LoadParams(*Vehicle, Test));
+			const double Weight = Sim()->GetMass() * Gravity;
 			const auto Load = [&State](EGTOWheel Wheel) { return State.Wheels[static_cast<int32>(Wheel)].Load; };
 			const double FrontLoad = Load(EGTOWheel::FrontLeft) + Load(EGTOWheel::FrontRight);
 			const double TotalLoad = FrontLoad + Load(EGTOWheel::RearLeft) + Load(EGTOWheel::RearRight);
 
-			Test.AddInfo(FString::Printf(TEXT("loads FL %.0f FR %.0f RL %.0f RR %.0f N (harness %.0f %.0f %.0f %.0f N), weight %.0f N, front share %.4f, max speed %g m/s, max angular speed %g rad/s, height %.4f m, %.1f physics steps/s"),
+			Test.AddInfo(FString::Printf(TEXT("loads FL %.0f FR %.0f RL %.0f RR %.0f N (test world %.0f %.0f %.0f %.0f N), weight %.0f N, front share %.4f, max speed %g m/s, max angular speed %g rad/s, height %.4f m, %.1f physics steps/s"),
 				Load(EGTOWheel::FrontLeft), Load(EGTOWheel::FrontRight), Load(EGTOWheel::RearLeft), Load(EGTOWheel::RearRight),
 				Expected[0], Expected[1], Expected[2], Expected[3],
 				Weight, FrontLoad / TotalLoad, MaxSpeed, MaxAngularSpeed, State.Chassis.Position.Z, Sim()->GetTicksPerSecond()));
 			for (int32 Index = 0; Index < GTONumWheels; ++Index)
 			{
-				// 1 % of the weight: Chaos and the harness integrate differently and use slightly different gravity.
-				Test.TestNearlyEqual(FString::Printf(TEXT("wheel %d load matches the harness (N)"), Index), State.Wheels[Index].Load, Expected[Index], 0.01 * Weight);
+				// 1 % of the wheel's load: Chaos and the test world integrate differently and use slightly different gravity.
+				Test.TestNearlyEqual(FString::Printf(TEXT("wheel %d load matches the test world (N)"), Index), State.Wheels[Index].Load, Expected[Index], 0.01 * Expected[Index]);
 			}
 			const double FixedRate = 1.0 / FixedStep;
 			Test.TestNearlyEqual(TEXT("physics steps per second match the fixed step"), Sim()->GetTicksPerSecond(), FixedRate, 0.05 * FixedRate);
@@ -217,6 +230,117 @@ namespace
 		bool bReset = false;
 	};
 
+	/**
+	 * Settled car, pushed sideways at standstill → comes to rest without swinging back (the worry of ADR 0002). Watched at
+	 * the ground below the centre of mass, so the body rolling back upright on its springs does not count.
+	 */
+	class FSidePushRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		static constexpr double SettleSeconds = 3.0;
+		static constexpr double WatchSeconds = 2.0;
+		static constexpr double RestSeconds = 1.0;
+		static constexpr double PushSpeed = 0.5; // m/s
+
+		virtual bool Step(uint32 Ticks) override
+		{
+			const FGTOChassisKinematics Chassis = Sim()->GetLatestState().Chassis;
+			if (Ticks < TicksFor(SettleSeconds))
+			{
+				return false;
+			}
+			if (!bPushed)
+			{
+				// A shove against the right flank: the car takes PushSpeed to the left at once.
+				UPrimitiveComponent* Body = CastChecked<UPrimitiveComponent>(Vehicle->GetRootComponent());
+				PushDirection = -Chassis.Orientation.GetRightVector();
+				Body->AddImpulse(PushDirection * (Sim()->GetMass() * PushSpeed * GTOUnits::CmPerM));
+				FHitResult Ground;
+				const FCollisionQueryParams Query(SCENE_QUERY_STAT(GTOSmokeGround), false, Vehicle.Get());
+				const FVector Centre = Chassis.Position * GTOUnits::CmPerM;
+				Vehicle->GetWorld()->LineTraceSingleByChannel(Ground, Centre, Centre - FVector(0.0, 0.0, 500.0), ECC_Visibility, Query);
+				Height = (Centre.Z - Ground.ImpactPoint.Z) / GTOUnits::CmPerM;
+				bPushed = true;
+				return false;
+			}
+
+			if (Ticks < TicksFor(SettleSeconds + WatchSeconds))
+			{
+				const FVector Below = Chassis.Orientation.RotateVector(FVector(0.0, 0.0, -Height));
+				const FVector Ground = Chassis.LinearVelocity + FVector::CrossProduct(Chassis.AngularVelocity, Below);
+				LowestSideSpeed = FMath::Min(LowestSideSpeed, FVector::DotProduct(Ground, PushDirection));
+				return false;
+			}
+			MaxRestSpeed = FMath::Max(MaxRestSpeed, Chassis.LinearVelocity.Size());
+			if (Ticks < TicksFor(SettleSeconds + WatchSeconds + RestSeconds))
+			{
+				return false;
+			}
+
+			Test.AddInfo(FString::Printf(TEXT("pushed at %.3f m height: lowest side speed at the ground %.4f m/s, at rest %g m/s"), Height, LowestSideSpeed, MaxRestSpeed));
+			// A little backward speed comes from the body rolling back upright on its dampers; a tyre that springs back
+			// reaches about -0.23 m/s (physics package, standstill_test.cpp).
+			Test.TestTrue(FString::Printf(TEXT("does not swing back (lowest side speed %.4f m/s)"), LowestSideSpeed), LowestSideSpeed > -0.02);
+			Test.TestTrue(FString::Printf(TEXT("at rest after %g s (%g m/s)"), WatchSeconds, MaxRestSpeed), MaxRestSpeed < 1.0e-3);
+			return true;
+		}
+
+		bool bPushed = false;
+		FVector PushDirection = FVector::ZeroVector;
+		double Height = 0.0; // m, centre of mass above the ground
+		double LowestSideSpeed = 0.0; // m/s, negative back towards where it stood
+		double MaxRestSpeed = 0.0;
+	};
+
+	/** A car whose vehicle file has an error → the error goes to the log with its field path, the car does not spawn. */
+	class FBrokenVehicleFileRun : public FSmokeRun
+	{
+	public:
+		using FSmokeRun::FSmokeRun;
+
+	private:
+		virtual bool Step(uint32 Ticks) override
+		{
+			// The player's car with one field broken: a negative track width at the front axle.
+			FString Text;
+			const UGTOVehicleDataAsset* Data = Vehicle->VehicleData;
+			if (!Data || !FFileHelper::LoadFileToString(Text, *Data->GetVehicleFilePath()))
+			{
+				Test.AddError(TEXT("cannot read the car's vehicle file"));
+				return true;
+			}
+			const int32 Replaced = Text.ReplaceInline(TEXT("\"track_width\": 1.56"), TEXT("\"track_width\": -1.56"));
+			const FString BrokenPath = FPaths::ProjectSavedDir() / TEXT("Automation/GTO/broken_vehicle.json");
+			if (Replaced != 1 || !FFileHelper::SaveStringToFile(Text, *BrokenPath))
+			{
+				Test.AddError(TEXT("cannot write the broken vehicle file"));
+				return true;
+			}
+
+			UGTOVehicleDataAsset* Broken = DuplicateObject(Data, GetTransientPackage());
+			Broken->VehicleFile = FPaths::ConvertRelativePathToFull(BrokenPath);
+			FString ContentDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir());
+			FPaths::MakePathRelativeTo(Broken->VehicleFile, *ContentDir);
+
+			Test.AddExpectedError(TEXT("axles.front.track_width"), EAutomationExpectedErrorFlags::Contains, 1);
+			Test.AddExpectedError(TEXT("is not spawned without a vehicle file"), EAutomationExpectedErrorFlags::Contains, 1);
+			FActorSpawnParameters Spawn;
+			Spawn.bDeferConstruction = true;
+			AGTOVehiclePawn* Car = Vehicle->GetWorld()->SpawnActor<AGTOVehiclePawn>(Start.GetLocation() + FVector(0.0, 1000.0, 0.0), Start.Rotator(), Spawn);
+			if (Car)
+			{
+				Car->VehicleData = Broken;
+				Car->FinishSpawning(FTransform(Start.Rotator(), Start.GetLocation() + FVector(0.0, 1000.0, 0.0)));
+			}
+			Test.TestFalse(TEXT("the car with the broken vehicle file is not in the world"), IsValid(Car));
+			IFileManager::Get().Delete(*BrokenPath);
+			return true;
+		}
+	};
+
 	/** Settled car → throttle → full brake: drives off straight ahead and stops again. */
 	class FDrivesAndStopsRun : public FSmokeRun
 	{
@@ -230,7 +354,7 @@ namespace
 
 		virtual bool Step(uint32 Ticks) override
 		{
-			FGTOInputPacket Packet;
+			FGTODriverInput Packet;
 			const FGTOChassisKinematics Chassis = Sim()->GetLatestState().Chassis;
 			if (Ticks < TicksFor(SettleSeconds))
 			{
@@ -383,7 +507,7 @@ namespace
 				Test.AddError(TEXT("the car has no lap timer"));
 				return true;
 			}
-			FGTOInputPacket Packet;
+			FGTODriverInput Packet;
 			if (Ticks >= TicksFor(1.0) && Ticks < TicksFor(5.0))
 			{
 				Packet.Throttle = 0.5f;
@@ -453,7 +577,8 @@ namespace
 				const FGTOTrackLayout& Layout = Track()->GetLayout();
 				const FGTOTrackCrossSection& Section = Layout.GetCrossSection();
 				const double OnCurb = Section.HalfWidth + 0.5 * (Section.CurbRise + Section.CurbWidth);
-				ResetOnTrack(Layout.GetSegmentStart(1) + 0.5 * Layout.GetSegments()[1].Length, -OnCurb + 0.5 * Sim()->GetParams().Front.TrackWidth);
+				const double FrontTrack = Sim()->GetWheelCentre(EGTOWheel::FrontRight, 0.0).Y - Sim()->GetWheelCentre(EGTOWheel::FrontLeft, 0.0).Y;
+				ResetOnTrack(Layout.GetSegmentStart(1) + 0.5 * Layout.GetSegments()[1].Length, -OnCurb + 0.5 * FrontTrack);
 				PhaseStart = Ticks;
 				Phase = 2;
 				return false;
@@ -502,7 +627,7 @@ namespace
 			}
 
 			const uint32 Since = Ticks - *PlacedAt;
-			FGTOInputPacket Packet;
+			FGTODriverInput Packet;
 			Packet.Throttle = Since < TicksFor(1.0) ? 0.f : 0.7f; // settle, then straight on
 			Vehicle->SetScriptedInput(Packet);
 			Watch(Since);
@@ -616,6 +741,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOResetPutsCarOnStartTest, "GTO.Smoke.ResetPu
 bool FGTOResetPutsCarOnStartTest::RunTest(const FString& Parameters)
 {
 	PlayMap<FResetRun>(*this, FlatTestMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOSidePushTest, "GTO.Smoke.SidePushComesToRest", SmokeTestFlags)
+
+bool FGTOSidePushTest::RunTest(const FString& Parameters)
+{
+	PlayMap<FSidePushRun>(*this, FlatTestMap);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGTOBrokenVehicleFileTest, "GTO.Smoke.BrokenVehicleFile", SmokeTestFlags)
+
+bool FGTOBrokenVehicleFileTest::RunTest(const FString& Parameters)
+{
+	PlayMap<FBrokenVehicleFileRun>(*this, FlatTestMap);
 	return true;
 }
 

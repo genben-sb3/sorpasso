@@ -1,109 +1,16 @@
 #include "Vehicle/GTOVehicleDataAsset.h"
 
 #include "Engine/StaticMesh.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "UObject/ConstructorHelpers.h"
-
-namespace
-{
-	FGTOTireCurveParams ToCurveParams(const FGTOTireCurveSettings& Settings)
-	{
-		FGTOTireCurveParams Curve;
-		Curve.PeakFriction = Settings.PeakFriction;
-		Curve.LoadSensitivity = Settings.LoadSensitivity;
-		Curve.PeakSlip = Settings.PeakSlip;
-		Curve.PeakSlipLoadSensitivity = Settings.PeakSlipLoadSensitivity;
-		Curve.Shape = Settings.Shape;
-		Curve.Curvature = Settings.Curvature;
-		Curve.CombinedSlipStiffness = Settings.CombinedSlipStiffness;
-		return Curve;
-	}
-
-	FGTOTireParams ToTireParams(const FGTOTireSettings& Settings)
-	{
-		FGTOTireParams Tire;
-		Tire.NominalLoad = Settings.NominalLoad;
-		Tire.Longitudinal = ToCurveParams(Settings.Longitudinal);
-		Tire.Lateral = ToCurveParams(Settings.Lateral);
-		Tire.RelaxationLength = Settings.RelaxationLength;
-		Tire.RelaxationMinSpeed = Settings.RelaxationMinSpeed;
-		Tire.RelaxationFullSpeed = Settings.RelaxationFullSpeed;
-		Tire.SlipMinSpeed = Settings.SlipMinSpeed;
-		Tire.RollingResistance = Settings.RollingResistance;
-		return Tire;
-	}
-
-	FGTOAxleParams ToAxleParams(const FGTOAxleSettings& Settings)
-	{
-		FGTOAxleParams Axle;
-		Axle.PositionX = Settings.PositionX;
-		Axle.TrackWidth = Settings.TrackWidth;
-		Axle.MountHeight = Settings.MountHeight;
-		Axle.WheelRadius = Settings.WheelRadius;
-		Axle.Suspension.SpringRate = Settings.Suspension.SpringRate;
-		Axle.Suspension.BumpDamping = Settings.Suspension.BumpDamping;
-		Axle.Suspension.ReboundDamping = Settings.Suspension.ReboundDamping;
-		Axle.Suspension.MaxLength = Settings.Suspension.MaxLength;
-		Axle.Suspension.BumpStopCompression = Settings.Suspension.BumpStopCompression;
-		Axle.Suspension.BumpStopRate = Settings.Suspension.BumpStopRate;
-		Axle.Suspension.AntiRollRate = Settings.Suspension.AntiRollRate;
-		Axle.WheelInertia = Settings.WheelInertia;
-		Axle.MaxSteerAngle = Settings.MaxSteerAngle;
-		Axle.BrakeTorque = Settings.BrakeTorque;
-		Axle.Tire = ToTireParams(Settings.Tire);
-		return Axle;
-	}
-}
+#include "ultragravity/vehicle_file.h"
 
 UGTOVehicleDataAsset::UGTOVehicleDataAsset()
 {
-	// SportsCar mesh: wheel centres 2.642 m apart, tyre centres 1.61 m apart, tyre radius 0.393 m. The centre of mass
-	// sits 1.189 m ahead of the rear axle (45:55 statics) and 0.50 m above the ground at rest. The mounts put both
-	// wheel centres 0.107 m below the centre of mass, the template's front ride height, once the springs carry their
-	// static share (6.4 cm compression front, 7.0 cm rear), so the car stands level.
-	FGTOAxleSettings Axle;
-	Axle.TrackWidth = 1.61;
-	Axle.WheelRadius = 0.393;
-	Axle.WheelInertia = 1.5;
-	Axle.Suspension.MaxLength = 0.20;
-	Axle.Suspension.BumpStopCompression = 0.11;
-	Axle.Suspension.BumpStopRate = 5.0e5;
-
-	// Road tyre at the spec's starting values: peak friction about 1.1, peak slip 0.1 and about 7°, relaxation length
-	// 0.4 m. Laterally a low C and negative E keep most of the grip past the peak, so a drift can be held.
-	FGTOTireSettings& Tire = Axle.Tire;
-	Tire.NominalLoad = 3200.0;
-	Tire.Longitudinal.PeakFriction = 1.1;
-	Tire.Longitudinal.LoadSensitivity = -0.15;
-	Tire.Longitudinal.PeakSlip = 0.1;
-	Tire.Longitudinal.Shape = 1.65;
-	Tire.Longitudinal.Curvature = 0.5;
-	Tire.Lateral.PeakFriction = 1.05;
-	Tire.Lateral.LoadSensitivity = -0.15;
-	Tire.Lateral.PeakSlip = 0.12;
-	Tire.Lateral.PeakSlipLoadSensitivity = 0.25;
-	Tire.Lateral.Shape = 1.3;
-	Tire.Lateral.Curvature = -0.5;
-
-	Front = Axle;
-	Front.PositionX = 1.453;
-	Front.MountHeight = 0.030;
-	Front.Suspension.SpringRate = 45000.0;
-	Front.Suspension.BumpDamping = 2500.0;
-	Front.Suspension.ReboundDamping = 4500.0;
-	Front.Suspension.AntiRollRate = 20000.0;
-	Front.MaxSteerAngle = 0.5;
-	Front.BrakeTorque = 2500.0;
-
-	Rear = Axle;
-	Rear.PositionX = -1.189;
-	Rear.MountHeight = 0.023;
-	Rear.Suspension.SpringRate = 50000.0;
-	Rear.Suspension.BumpDamping = 2800.0;
-	Rear.Suspension.ReboundDamping = 5000.0;
-	Rear.Suspension.AntiRollRate = 10000.0;
-	Rear.BrakeTorque = 1200.0; // under hard braking the fronts lock first, which keeps the car straight
-
-	// The body mesh origin sits on the ground between the axles; BodyMeshOffset puts its wheel arches over the wheels.
+	// SportsCar mesh of the UE Vehicle Template: in mesh space the wheel centres sit 1.35 m ahead of and 1.29 m behind
+	// the origin, 0.25 m above it, with a tyre radius of 0.393 m. BodyMeshOrigin puts the front wheel arches over the
+	// front axle of the vehicle file and the arch centres at the height of its wheel centres at rest (0.33 m).
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Game/Vehicles/SportsCar/SM_SportsCar.SM_SportsCar"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GlassAsset(TEXT("/Game/Vehicles/SportsCar/SM_SportsCar_Glass.SM_SportsCar_Glass"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WheelAsset(TEXT("/Game/Vehicles/SportsCar/SM_SportsCar_Wheel.SM_SportsCar_Wheel"));
@@ -112,15 +19,28 @@ UGTOVehicleDataAsset::UGTOVehicleDataAsset()
 	WheelMesh = WheelAsset.Object;
 }
 
-FGTOVehicleParams UGTOVehicleDataAsset::ToParams() const
+FString UGTOVehicleDataAsset::GetVehicleFilePath() const
 {
-	FGTOVehicleParams Params;
-	Params.Mass = Mass;
-	Params.Inertia = Inertia;
-	Params.Front = ToAxleParams(Front);
-	Params.Rear = ToAxleParams(Rear);
-	Params.Drive.MaxTorque = DriveTorque;
-	Params.Drive.MaxPower = DrivePower;
-	Params.HandbrakeTorque = HandbrakeTorque;
-	return Params;
+	return FPaths::ProjectContentDir() / VehicleFile;
+}
+
+bool UGTOVehicleDataAsset::LoadVehicleParams(ultragravity::VehicleParams& OutParams, FString& OutError) const
+{
+	const FString Path = GetVehicleFilePath();
+	TArray<uint8> Bytes;
+	if (!FFileHelper::LoadFileToArray(Bytes, *Path))
+	{
+		OutError = FString::Printf(TEXT("vehicle file %s: cannot be read"), *Path);
+		return false;
+	}
+
+	// The physics package parses and checks the text; it opens no files inside Unreal (ADR 0010).
+	ultragravity::LoadResult Result = ultragravity::parse_vehicle_file(std::string_view(reinterpret_cast<const char*>(Bytes.GetData()), Bytes.Num()));
+	if (Result.error)
+	{
+		OutError = FString::Printf(TEXT("vehicle file %s: %s: %s"), *Path, UTF8_TO_TCHAR(Result.error->field.c_str()), UTF8_TO_TCHAR(Result.error->message.c_str()));
+		return false;
+	}
+	OutParams = MoveTemp(Result.params);
+	return true;
 }

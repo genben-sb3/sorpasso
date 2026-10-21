@@ -1,5 +1,5 @@
 ---
-status: superseded by ADR 0009
+status: accepted (nach ADR 0009 wieder in Kraft, siehe Nachtrag)
 ---
 
 # Relaxationslänge wirkt erst oberhalb einer Mindestgeschwindigkeit
@@ -15,3 +15,9 @@ Den Längsschlupf verzögern wir gar nicht: Rad und Reifen ergäben dort eine ka
 - Unter etwa 36 km/h reagiert die Lenkung ohne Reifenverzögerung. Das verzögerte, progressive Einlenken (Story 8) kommt dort aus der Eingabe-Glättung (#11).
 - `GTO.Sim.Driving` prüft das: Seitlich angestoßen kommt das stehende Auto zur Ruhe, ohne zurückzuschwingen.
 - Fühlt sich das Einlenken bei mittlerer Geschwindigkeit im Playtest zu direkt an, lassen sich beide Schwellen als Daten absenken. Darunter bräuchte es eine eigene Dämpfung im Reifen.
+
+## Nachtrag aus #23: wieder in Kraft, jetzt im Physikpaket
+
+ADR 0009 hatte die Relaxation des Physikpakets übernommen (Verzögerung überall, Untergrenze der Geschwindigkeit). In Unreal und in der Testwelt schaukelte das stehende Auto nach einem seitlichen Stoß genau wie hier befürchtet: Am Boden rutschte es mit bis zu 0,23 m/s zurück, die Karosserie wechselte dreimal die Rollseite. Das Paket blendet die Verzögerung deshalb wieder ein, mit den Schwellen von hier (5 und 10 m/s) als Konstanten des Reifenmodells in `vehicle_step.cpp`; die Untergrenze entfällt. Geprüft in `ultragravity/tests/standstill_test.cpp` und `GTO.Smoke.SidePushComesToRest`; `GTO.Sim.Driving` gibt es nicht mehr. Die Parameter `RelaxationMinSpeed` und `RelaxationFullSpeed` von GTOSim stehen nicht in der Fahrzeugdatei: Sie sind eine Eigenschaft des numerischen Reifenmodells, nicht eines Autos.
+
+Ohne Verzögerung ist der Reifen im Stand ein steifer Dämpfer. Gegen eine über den ganzen Tick festgehaltene Drehung der Karosserie rechnet er an der Stabilitätsgrenze: Die Gierrate eines im Stand angestoßenen Autos kippte jeden Tick das Vorzeichen und klang kaum ab. Die Substeps des Pakets führen deshalb neben der Geschwindigkeit auch die Winkelgeschwindigkeit der Karosserie mit den Reifenkräften mit (research/fahrphysik.md, 9.2); geprüft in `standstill_test.cpp`.

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Check run of the physics package: unit/header check, then a build with sanitizers and -Werror and all tests.
-# Only runs when the commit contains physics files (Source/UltraGravity/ or ultragravity/).
+# Only runs when the commit contains physics files (Source/UltraGravity/, ultragravity/ or the vehicle files).
 # Quiet on success, full output only on failure.
 #
 # Enable without cutting off the Git LFS hooks in .git/hooks (core.hooksPath stays unchanged;
@@ -8,7 +8,7 @@
 #   ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-commit"
 root=$(git rev-parse --show-toplevel) || exit 1
 
-if git diff --cached --quiet -- Source/UltraGravity ultragravity; then
+if git diff --cached --quiet -- Source/UltraGravity ultragravity Content/VehicleFiles; then
     exit 0
 fi
 

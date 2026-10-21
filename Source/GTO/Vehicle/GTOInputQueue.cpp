@@ -1,20 +1,21 @@
-#include "GTOInputQueue.h"
+#include "Vehicle/GTOInputQueue.h"
+
 #include "Misc/ScopeLock.h"
 
-void FGTOInputQueue::Push(const FGTOInputPacket& Packet)
+void FGTOInputQueue::Push(uint32 Tick, const FGTODriverInput& Input)
 {
 	FScopeLock ScopeLock(&Lock);
-	Pending.Add(Packet);
+	Pending.Add({ Tick, Input });
 }
 
-FGTOInputPacket FGTOInputQueue::Pop(uint32 Tick)
+FGTODriverInput FGTOInputQueue::Pop(uint32 Tick)
 {
 	FScopeLock ScopeLock(&Lock);
 	for (int32 Index = 0; Index < Pending.Num();)
 	{
 		if (Pending[Index].Tick <= Tick)
 		{
-			Last = Pending[Index]; // queued later means newer
+			Last = Pending[Index].Input; // queued later means newer
 			Pending.RemoveAt(Index);
 		}
 		else
@@ -22,7 +23,6 @@ FGTOInputPacket FGTOInputQueue::Pop(uint32 Tick)
 			++Index;
 		}
 	}
-	Last.Tick = Tick;
 	return Last;
 }
 
@@ -30,5 +30,5 @@ void FGTOInputQueue::Reset()
 {
 	FScopeLock ScopeLock(&Lock);
 	Pending.Reset();
-	Last = FGTOInputPacket();
+	Last = FGTODriverInput();
 }

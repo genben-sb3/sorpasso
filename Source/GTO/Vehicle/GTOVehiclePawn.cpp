@@ -21,8 +21,11 @@
 #include "Vehicle/GTOUnits.h"
 #include "Vehicle/GTOVehicleDataAsset.h"
 #include "Vehicle/GTOVehicleSimComponent.h"
+#include "ultragravity/vehicle_file.h"
 
 using namespace GTOUnits;
+
+DEFINE_LOG_CATEGORY_STATIC(LogGTOVehicle, Log, All);
 
 namespace
 {
@@ -134,7 +137,18 @@ void AGTOVehiclePawn::ResetToStart()
 void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
 {
 	const UGTOVehicleDataAsset& Data = GetVehicleData();
-	const FGTOVehicleParams Params = Data.ToParams();
+	ultragravity::VehicleParams Params;
+	FString Error;
+	if (!Data.LoadVehicleParams(Params, Error))
+	{
+		UE_LOG(LogGTOVehicle, Error, TEXT("%s"), *Error);
+		if (!Sim->HasParams())
+		{
+			UE_LOG(LogGTOVehicle, Error, TEXT("%s is not spawned without a vehicle file"), *GetName());
+			Destroy();
+		}
+		return;
+	}
 	ApplyShapeAndMeshes(Data);
 
 	const FRotator Rotation(0.0, Transform.Rotator().Yaw, 0.0);
@@ -143,14 +157,15 @@ void AGTOVehiclePawn::ResetTo(const FTransform& Transform)
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(GTOResetGround), false, this);
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Location + FVector(0.0, 0.0, 200.0), Location - FVector(0.0, 0.0, 10000.0), ECC_Visibility, Query))
 	{
-		Location.Z = Hit.ImpactPoint.Z + (Params.FullDroopHeight() + ResetDropHeight) * CmPerM;
+		Location.Z = Hit.ImpactPoint.Z + (UGTOVehicleSimComponent::FullDroopHeight(Params) + ResetDropHeight) * CmPerM;
 	}
 
 	Chassis->SetWorldLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::ResetPhysics);
 	Chassis->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	Chassis->SetPhysicsAngularVelocityInRadians(FVector::ZeroVector);
-	Chassis->SetMassOverrideInKg(NAME_None, Params.Mass, true);
+	Chassis->SetMassOverrideInKg(NAME_None, Params.mass, true);
 	Sim->Restart(Chassis, Params);
+	PlaceMeshes(Data);
 	WheelSpin = TStaticArray<double, GTONumWheels>(InPlace, 0.0);
 	if (LapTimer)
 	{
@@ -171,11 +186,19 @@ void AGTOVehiclePawn::ApplyShapeAndMeshes(const UGTOVehicleDataAsset& Data)
 		Chassis->SetBoxExtent(Data.CollisionExtent); // may recreate the physics body, so only on a change
 	}
 	BodyMesh->SetStaticMesh(Data.BodyMesh);
-	BodyMesh->SetRelativeLocation(Data.BodyMeshOffset);
 	GlassMesh->SetStaticMesh(Data.GlassMesh);
 	for (UStaticMeshComponent* Wheel : WheelMeshes)
 	{
 		Wheel->SetStaticMesh(Data.WheelMesh);
+	}
+}
+
+void AGTOVehiclePawn::PlaceMeshes(const UGTOVehicleDataAsset& Data)
+{
+	BodyMesh->SetRelativeLocation(Sim->GetVehicleFrameOrigin() * CmPerM + Data.BodyMeshOrigin);
+	for (int32 Index = 0; Index < GTONumWheels; ++Index)
+	{
+		WheelMeshes[Index]->SetRelativeScale3D(FVector(Sim->GetWheelRadius(static_cast<EGTOWheel>(Index)) * CmPerM / Data.WheelMeshRadius));
 	}
 }
 
@@ -203,12 +226,11 @@ void AGTOVehiclePawn::Tick(float DeltaSeconds)
 void AGTOVehiclePawn::UpdateDisplay()
 {
 	const FGTOVehicleState Shown = Sim->GetDisplayState();
-	const FGTOVehicleParams Params = Sim->GetParams();
 
 	DisplayRoot->SetWorldLocationAndRotation(Shown.Chassis.Position * CmPerM, Shown.Chassis.Orientation);
 	for (int32 Index = 0; Index < GTONumWheels; ++Index)
 	{
-		const FVector Centre = Params.WheelCentreLocal(static_cast<EGTOWheel>(Index), Shown.Wheels[Index].Compression) * CmPerM;
+		const FVector Centre = Sim->GetWheelCentre(static_cast<EGTOWheel>(Index), Shown.Wheels[Index].Compression) * CmPerM;
 
 		// Steered about the vertical, spun about the axle. The right wheels are the left mesh turned around, so for them
 		// rolling forward is a positive pitch in mesh space.
@@ -216,7 +238,7 @@ void AGTOVehiclePawn::UpdateDisplay()
 		const FRotator Rotation(FMath::RadiansToDegrees(WheelSpin[Index]) * (bLeft ? -1.0 : 1.0), FMath::RadiansToDegrees(Shown.Wheels[Index].SteerAngle) + (bLeft ? 0.0 : 180.0), 0.0);
 
 		UStaticMeshComponent* WheelMesh = WheelMeshes[Index];
-		const FVector MeshCentre = WheelMesh->GetStaticMesh() ? WheelMesh->GetStaticMesh()->GetBounds().Origin : FVector::ZeroVector;
+		const FVector MeshCentre = WheelMesh->GetStaticMesh() ? WheelMesh->GetStaticMesh()->GetBounds().Origin * WheelMesh->GetRelativeScale3D() : FVector::ZeroVector;
 		WheelMesh->SetRelativeLocationAndRotation(Centre - Rotation.RotateVector(MeshCentre), Rotation);
 	}
 }
@@ -226,7 +248,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	// Default layout, created in code so it stays readable and reviewable. Keyboard and gamepad are mapped side by side
-	// and both work at any time; for now their values go straight into the input packet.
+	// and both work at any time; for now their values go straight to the sim.
 	UInputAction* ResetAction = MakeButtonAction(this, TEXT("IA_Reset"));
 	UInputAction* TelemetryAction = MakeButtonAction(this, TEXT("IA_ToggleTelemetry"));
 	UInputAction* QuitAction = MakeButtonAction(this, TEXT("IA_Quit"));
@@ -277,20 +299,20 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	}
 }
 
-FGTOInputPacket AGTOVehiclePawn::ReadDriverInput() const
+FGTODriverInput AGTOVehiclePawn::ReadDriverInput() const
 {
-	FGTOInputPacket Packet;
+	FGTODriverInput Driver;
 	const UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!Input || !SteerAction)
 	{
-		return Packet; // not driven by a player
+		return Driver; // not driven by a player
 	}
 	const auto Value = [Input](const UInputAction* Action) { return Input->GetBoundActionValue(Action).Get<float>(); };
-	Packet.Steer = FMath::Clamp(Value(SteerAction), -1.f, 1.f);
-	Packet.Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
-	Packet.Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
-	Packet.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
-	return Packet;
+	Driver.Steer = FMath::Clamp(Value(SteerAction), -1.f, 1.f);
+	Driver.Throttle = FMath::Clamp(Value(ThrottleAction), 0.f, 1.f);
+	Driver.Brake = FMath::Clamp(Value(BrakeAction), 0.f, 1.f);
+	Driver.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
+	return Driver;
 }
 
 void AGTOVehiclePawn::ToggleTelemetry()

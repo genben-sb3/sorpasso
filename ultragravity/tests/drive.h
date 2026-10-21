@@ -18,22 +18,18 @@ inline constexpr double rpm = 2.0 * std::numbers::pi / 60.0; // rad/s per rpm
 
 inline double engine_speed(const TestWorld& world) { return world.last_step().animation.engine_speed; }
 
-inline VehicleParams sports_coupe() {
+// The sports coupe as its vehicle file describes it, with the automatic the game drives.
+inline VehicleParams with_automatic() {
     LoadResult result = load_vehicle_file(UG_VEHICLES_DIR "/sports_coupe.json");
     REQUIRE_FALSE(result.error.has_value());
     return result.params;
 }
 
-inline VehicleParams with_automatic() {
-    VehicleParams car = sports_coupe();
-    car.drivetrain.gearbox.mode = GearboxMode::automatic;
-    car.drivetrain.gearbox.automatic = {.upshift_speed = 6500.0 * rpm,
-                                        .downshift_speed = 2500.0 * rpm,
-                                        .brake_downshift_speed = 4000.0 * rpm,
-                                        .hold_time = 0.8,
-                                        .engage_range = 1500.0 * rpm,
-                                        .engage_time = 0.15,
-                                        .drift_angle = 10.0 * std::numbers::pi / 180.0};
+// The sports coupe with a manual gearbox: the gear request selects the gear itself. Most tests drive it
+// that way, so a gear change happens exactly when the test asks for it.
+inline VehicleParams sports_coupe() {
+    VehicleParams car = with_automatic();
+    car.drivetrain.gearbox.mode = GearboxMode::manual;
     return car;
 }
 

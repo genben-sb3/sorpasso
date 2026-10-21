@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "ultragravity/export.h"
 #include "ultragravity/input.h"
 #include "ultragravity/vehicle_file.h"
 #include "ultragravity/vehicle_step.h"
@@ -50,12 +51,12 @@ struct SmoothingResult {
 // the front tire should not exceed the peak slip angle (scaled by
 // peak_fraction), plus the steer angle the corner demands kinematically at full
 // lateral acceleration.
-double steering_limit(const VehicleParams& params, double speed, double peak_fraction);
+UG_API double steering_limit(const VehicleParams& params, double speed, double peak_fraction);
 
 // Turns raw signals into an input packet. A pure function: reads the
 // last state of the body and writes nothing back. Test drivers and AI
 // do not call it.
-SmoothingResult smooth(const SmoothingState& state, const SmoothingParams& params,
+UG_API SmoothingResult smooth(const SmoothingState& state, const SmoothingParams& params,
                        const VehicleParams& vehicle, const BodyMotion& body,
                        const RawInput& raw, std::uint32_t tick, double dt);
 

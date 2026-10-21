@@ -10,6 +10,6 @@ Für den Reifen gilt das Modell des Pakets: Der Schräglaufwinkel folgt bei jede
 
 ## Konsequenzen
 
-- Schaukelt das stehende Auto in Unreal nach einem seitlichen Stoß (die Sorge aus ADR 0002), übernimmt das Paket die Einblendung aus ADR 0002, statt dass der Adapter sie nachbaut.
+- Schaukelt das stehende Auto in Unreal nach einem seitlichen Stoß (die Sorge aus ADR 0002), übernimmt das Paket die Einblendung aus ADR 0002, statt dass der Adapter sie nachbaut. So kam es (#23): ADR 0002 ist wieder in Kraft, siehe dort.
 - Physik prüfen die doctest-Tests des CMake-Projekts; Unreal-Automation prüft nur noch das Zusammenspiel von Adapter und Chaos (`GTO.Smoke.`). Die `GTO.Sim.`-Tests fallen mit GTOSim weg.
 - ADR 0001 (Adapter im Async-Physics-Tick, gemittelte Kräfte über 8 Substeps) gilt unverändert für den neuen Adapter; das Paket rechnet wie Chaos mit 1/120 s und 8 Substeps.

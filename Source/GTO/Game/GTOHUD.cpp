@@ -70,7 +70,7 @@ void AGTOHUD::DrawTelemetry(const AGTOVehiclePawn& Vehicle)
 	const FGTOVehicleState State = Sim->GetLatestState();
 	const auto& Wheels = State.Wheels;
 
-	const FGTOInputPacket& Input = Vehicle.GetLastInput();
+	const FGTODriverInput& Input = Vehicle.GetLastInput();
 	const double Speed = State.Chassis.Orientation.UnrotateVector(State.Chassis.LinearVelocity).X;
 
 	TArray<FString> Lines;

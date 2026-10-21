@@ -334,13 +334,13 @@ TEST_CASE("Missing or implausible aero and rolling resistance values are reporte
     CHECK(result.error->field == expected_field);
 }
 
-TEST_CASE("The sports coupe has rear-wheel drive, a manual gearbox and a limited-slip differential") {
+TEST_CASE("The sports coupe has rear-wheel drive, an automatic gearbox and a limited-slip differential") {
     const LoadResult result = load_vehicle_file(sports_coupe_path);
 
     REQUIRE_FALSE(result.error.has_value());
     const Drivetrain& drivetrain = result.params.drivetrain;
     CHECK(drivetrain.layout == DriveLayout::rear);
-    CHECK(drivetrain.gearbox.mode == GearboxMode::manual);
+    CHECK(drivetrain.gearbox.mode == GearboxMode::automatic);
     CHECK(drivetrain.differential.limited_slip);
     CHECK(drivetrain.differential.preload > 0.0);
 }
@@ -412,10 +412,9 @@ TEST_CASE("Invalid combinations of drive layout, differential and gearbox mode a
          "drivetrain.differential.preload", "only exists with a limited-slip differential"},
         {"unknown gearbox mode", [](json& j) { j["drivetrain"]["gearbox"]["mode"] = "dual_clutch"; },
          "drivetrain.gearbox.mode", "must be \"manual\" or \"automatic\""},
-        {"automatic without shift points", [](json& j) { j["drivetrain"]["gearbox"]["mode"] = "automatic"; },
+        {"automatic without shift points", [](json& j) { j["drivetrain"]["gearbox"].erase("automatic"); },
          "drivetrain.gearbox.automatic", "is missing"},
-        {"shift points without automatic",
-         [](json& j) { j["drivetrain"]["gearbox"]["automatic"] = automatic_block(); },
+        {"shift points without automatic", [](json& j) { j["drivetrain"]["gearbox"]["mode"] = "manual"; },
          "drivetrain.gearbox.automatic", "only exists in gearbox mode automatic"},
         {"automatic that would hunt",
          [](json& j) {

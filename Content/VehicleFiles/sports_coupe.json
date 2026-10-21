@@ -106,7 +106,16 @@
       "reverse_ratio": 3.4,
       "final_drive": 3.6,
       "shift_time": 0.25,
-      "mode": "manual"
+      "mode": "automatic",
+      "automatic": {
+        "upshift_rpm": 6500.0,
+        "downshift_rpm": 2500.0,
+        "brake_downshift_rpm": 4000.0,
+        "hold_time": 0.8,
+        "engage_range_rpm": 1500.0,
+        "engage_time": 0.15,
+        "drift_angle_deg": 10.0
+      }
     }
   }
 }

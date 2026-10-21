@@ -17,8 +17,9 @@ target_include_directories(ultragravity_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/third_party
   ${PROJECT_SOURCE_DIR}/../Source/UltraGravity/ThirdParty)
 target_link_libraries(ultragravity_tests PRIVATE ultragravity::test_world)
+# The vehicle files live in the game's Content folder, so packaged builds take them along (ADR 0010).
 target_compile_definitions(ultragravity_tests PRIVATE
-  UG_VEHICLES_DIR="${PROJECT_SOURCE_DIR}/vehicles")
+  UG_VEHICLES_DIR="${PROJECT_SOURCE_DIR}/../Content/VehicleFiles")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(ultragravity_tests PRIVATE -Wall -Wextra -Wpedantic)

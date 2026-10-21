@@ -1,6 +1,6 @@
 # Coding Standards
 
-Gelten für das Physikpaket: das Unreal-Modul `Source/UltraGravity/` und das CMake-Projekt `ultragravity/` (Testwelt, Tests, Fahrzeugdateien). Gelesen beim Review. Mechanisches prüft der Hook `.githooks/pre-commit` (Sanitizer, `-Werror`, Vorhandensein von Einheitenkommentaren, `// API` an Header-Konstanten); hier stehen nur Ermessensfragen. Ergänzend gelten `CONTEXT.md` (Namen) und `docs/adr/` (Architektur).
+Gelten für das Physikpaket: das Unreal-Modul `Source/UltraGravity/`, das CMake-Projekt `ultragravity/` (Testwelt, Tests) und die Fahrzeugdateien in `Content/VehicleFiles/`. Gelesen beim Review. Mechanisches prüft der Hook `.githooks/pre-commit` (Sanitizer, `-Werror`, Vorhandensein von Einheitenkommentaren, `// API` an Header-Konstanten); hier stehen nur Ermessensfragen. Ergänzend gelten `CONTEXT.md` (Namen) und `docs/adr/` (Architektur).
 
 ## Physikalische Größen
 
@@ -15,7 +15,7 @@ Gelten für das Physikpaket: das Unreal-Modul `Source/UltraGravity/` und das CMa
 
 ## Fahrzeugdateien
 
-- Änderungen an Fahrzeugdateien (`ultragravity/vehicles/*.json`) sind chirurgisch: nur die betroffenen Zeilen, die bestehende Formatierung (einzeilige kleine Objekte wie `center_of_mass`) bleibt. Die Datei wird nicht über einen JSON-Serializer neu geschrieben.
+- Änderungen an Fahrzeugdateien (`Content/VehicleFiles/*.json`) sind chirurgisch: nur die betroffenen Zeilen, die bestehende Formatierung (einzeilige kleine Objekte wie `center_of_mass`) bleibt. Die Datei wird nicht über einen JSON-Serializer neu geschrieben.
 
 ## Tests
 

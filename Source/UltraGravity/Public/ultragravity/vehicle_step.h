@@ -3,6 +3,7 @@
 #include <array>
 
 #include "ultragravity/animation_data.h"
+#include "ultragravity/export.h"
 #include "ultragravity/input.h"
 #include "ultragravity/vector_math.h"
 #include "ultragravity/vehicle_file.h"
@@ -76,13 +77,13 @@ struct StepResult {
     Telemetry telemetry;
 };
 
-std::array<ProbeRay, wheel_count> probe_rays(const VehicleParams& params, const BodyMotion& body);
+UG_API std::array<ProbeRay, wheel_count> probe_rays(const VehicleParams& params, const BodyMotion& body);
 
 // State of a car rolling straight ahead in neutral at the given speed.
-State rolling_state(const VehicleParams& params, double speed);
+UG_API State rolling_state(const VehicleParams& params, double speed);
 
 // The vehicle step: a pure function without global state.
-StepResult vehicle_step(const State& state, const VehicleParams& params,
+UG_API StepResult vehicle_step(const State& state, const VehicleParams& params,
                         const InputPacket& input, const WheelContacts& contacts,
                         const BodyMotion& body, double dt);
 

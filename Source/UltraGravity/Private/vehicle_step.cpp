@@ -78,9 +78,12 @@ constexpr double steering_wheel_lock = 2.5 * std::numbers::pi; // rad
 // value, so the slip does not run toward infinity at standstill.
 constexpr double slip_denominator_min = 1.0; // m/s
 
-// Lower bound of the wheel speed for the relaxation. Without it the
-// slip angle would freeze at standstill, because the tire only deforms while rolling.
-constexpr double relaxation_min = 1.0; // m/s
+// The relaxation lag only acts at speed (ADR 0002): below the start the slip angle acts at once, up to
+// the end the lag is blended in. At low speed the lagging tire is a spring in series with a damper whose
+// oscillation is hardly damped, so a car shoved at standstill would rock; without the lag it is a pure
+// damper there. A property of the tire model, not of a car, so it is not in the vehicle file.
+constexpr double relaxation_blend_start = 5.0; // m/s
+constexpr double relaxation_blend_end = 10.0;  // m/s
 
 double slip_denominator(double v) { return std::sqrt(v * v + slip_denominator_min * slip_denominator_min); }
 
@@ -178,7 +181,7 @@ struct TireForce {
 // Tire forces of a wheel in contact at velocity v at the contact point.
 // The slip angle the tire feels follows the kinematic one over the
 // relaxation length: dα/ds = (α_kin − α)/σ with s the distance the wheel covers
-// over the ground, exact over the substep.
+// over the ground, exact over the substep. At low speed it is the kinematic one.
 TireForce tire_force(const WheelSetup& wheel, Vec3 v, double omega, double h, double& slip_angle) {
     const Tire& tire = wheel.axle->tire;
     const double r = wheel.axle->wheel_radius;             // m
@@ -186,8 +189,10 @@ TireForce tire_force(const WheelSetup& wheel, Vec3 v, double omega, double h, do
     const double vy = dot(v, wheel.lateral);               // m/s
     const double denominator = slip_denominator(vx);       // m/s
     const double kinematic = std::atan(vy / denominator);  // rad
-    const double distance = std::max(std::hypot(vx, vy), relaxation_min) * h; // m
-    slip_angle += (kinematic - slip_angle) * (1.0 - std::exp(-distance / tire.relaxation_length));
+    const double speed = std::hypot(vx, vy); // m/s
+    const double lagged = slip_angle + (kinematic - slip_angle) * (1.0 - std::exp(-speed * h / tire.relaxation_length)); // rad
+    const double lag = std::clamp((speed - relaxation_blend_start) / (relaxation_blend_end - relaxation_blend_start), 0.0, 1.0); // 1
+    slip_angle = kinematic + (lagged - kinematic) * lag;
 
     const double slip = slip_ratio(omega, r, vx); // 1
     const CurvePoint curve = magic_formula(tire.longitudinal, slip);
@@ -432,11 +437,13 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
 
     air_forces(params, body, v_longitudinal, result.forces);
 
-    // Wheels and tires in substeps. Wheel load, contact point and rotation of the
-    // body stay fixed meanwhile. Deliberate approximation: only the velocity of the
-    // body is carried along with the tire forces, so the stiff tire does not work
-    // against an outdated velocity over the whole tick at a small slip denominator
-    // (research/fahrphysik.md, 9.2).
+    // Wheels and tires in substeps. Wheel load, contact point and orientation of the
+    // body stay fixed meanwhile. Deliberate approximation: only the linear and angular
+    // velocity of the body are carried along with the tire forces, so the stiff tire
+    // does not work against an outdated velocity over the whole tick at a small slip
+    // denominator (research/fahrphysik.md, 9.2). Without the angular velocity a car
+    // turned at standstill, where the tire is a pure damper (ADR 0002), would
+    // flip its yaw rate every tick.
     const Drivetrain& drivetrain = params.drivetrain;
     const DrivenAxles driven = driven_axles(params);
     const bool automatic = drivetrain.gearbox.mode == GearboxMode::automatic;
@@ -481,6 +488,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     const double h = dt / substeps;                // s
     const double substep_weight = 1.0 / substeps;  // 1
     Vec3 body_dv; // m/s
+    Vec3 body_dw; // rad/s, world frame
     for (int step = 0; step < substeps; ++step) {
         // During an automatic shift the automatic closes the throttle.
         double throttle = automatic && result.state.shift_remaining > 0.0 ? 0.0 : input.throttle; // 1
@@ -489,16 +497,16 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         engine_speed = std::max(engine_speed, 0.0);
         for (int i = 0; i < wheel_count; ++i) result.state.wheel_angle[i] += h * result.state.wheel_speed[i];
 
-        Vec3 total_tire_force; // N
+        Vec3 total_tire_force;  // N
+        Vec3 total_tire_torque; // N·m about the center of mass
         std::array<double, wheel_count> free_speed{}; // rad/s after tire and drive, before the brake
         for (int i = 0; i < wheel_count; ++i) {
             const WheelSetup& wheel = wheels[i];
             const double inertia = wheel.axle->tire.inertia; // kg·m²
             const double r = wheel.axle->wheel_radius;       // m
             const double omega = result.state.wheel_speed[i]; // rad/s
-            const TireForce k = wheel.contact ? tire_force(wheel, wheel.contact_velocity + body_dv, omega, h,
-                                                           result.state.slip_angle[i])
-                                              : TireForce{};
+            const Vec3 v = wheel.contact_velocity + body_dv + cross(body_dw, wheel.lever); // m/s
+            const TireForce k = wheel.contact ? tire_force(wheel, v, omega, h, result.state.slip_angle[i]) : TireForce{};
 
             // Semi-implicit: the tire force is linearized about the new wheel speed,
             // otherwise the wheel oscillates at a small slip denominator.
@@ -507,14 +515,19 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
 
             if (!wheel.contact) continue;
             const Vec3 force = wheel.longitudinal * fx + wheel.lateral * k.lateral; // N
+            const Vec3 torque = cross(wheel.lever, force); // N·m
             total_tire_force += force;
+            total_tire_torque += torque;
             result.telemetry.slip[i] += k.slip * substep_weight;
             result.telemetry.force_longitudinal[i] += fx * substep_weight;
             result.telemetry.force_lateral[i] += k.lateral * substep_weight;
             result.forces.force += force * substep_weight;
-            result.forces.torque += cross(wheel.lever, force) * substep_weight;
+            result.forces.torque += torque * substep_weight;
         }
         body_dv += total_tire_force * (h / params.mass);
+        const Vec3 torque_vehicle = rotate_inverse(body.orientation, total_tire_torque); // N·m
+        const Vec3 I = params.inertia; // kg·m²
+        body_dw += rotate(body.orientation, {torque_vehicle.x / I.x, torque_vehicle.y / I.y, torque_vehicle.z / I.z}) * h;
 
         // The clutch is a limited impulse that brings the engine and the gearbox input
         // to the same speed: if its torque suffices it sticks, otherwise it slips.
