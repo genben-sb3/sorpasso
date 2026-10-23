@@ -13,6 +13,7 @@ add_executable(ultragravity_tests
   telemetry_test.cpp
   test_maneuver_test.cpp
   abs_test.cpp
+  stability_test.cpp
 )
 # doctest lives here, nlohmann json in the Unreal module.
 target_include_directories(ultragravity_tests PRIVATE

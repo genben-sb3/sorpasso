@@ -304,12 +304,14 @@ struct Lane {
 
 // One pass of the lane change with entry speed `speed` in m/s. Empty result: succeeded,
 // otherwise the reason.
-std::optional<std::string> run_lane_change(const VehicleParams& params, double speed, std::ostream* telemetry) {
+std::optional<std::string> run_lane_change(const VehicleParams& params, double speed, bool with_esc,
+                                           std::ostream* telemetry) {
     const Lane lane{std::max(params.front.track_width, params.rear.track_width) + lane_tire_margin};
     Run run(params, speed, telemetry);
     SteeringController steer(params);
     InputPacket p;
     p.clutch = 1.0; // clutch in, throttle off, as in the moose test
+    p.driving_aids.stability_control = with_esc;
     const auto path = [](double x) { return Lane::center(x - lane_run_up); };
     while (run.position() < lane_run_up + Lane::length + lane_run_out) {
         p.steering = steer.path(run.world().body(), path, std::max(lane_lookahead_min, lane_lookahead * speed));
@@ -325,12 +327,12 @@ std::optional<std::string> run_lane_change(const VehicleParams& params, double s
     return std::nullopt;
 }
 
-Measurement find_lane_change(Measurement m, const VehicleParams& params, std::ostream* telemetry) {
+Measurement find_lane_change(Measurement m, const VehicleParams& params, bool with_esc, std::ostream* telemetry) {
     double last = 0.0; // m/s, highest successful entry speed of the staircase
     std::string reason;
     double speed = lane_start; // m/s
     for (; speed <= lane_at_most; speed += lane_step) {
-        if (const auto failure = run_lane_change(params, speed, nullptr)) {
+        if (const auto failure = run_lane_change(params, speed, with_esc, nullptr)) {
             reason = *failure;
             break;
         }
@@ -341,10 +343,10 @@ Measurement find_lane_change(Measurement m, const VehicleParams& params, std::os
     if (!reason.empty()) {
         while (bad - good > lane_accuracy) {
             const double mid = 0.5 * (good + bad); // m/s
-            (run_lane_change(params, mid, nullptr) ? bad : good) = mid;
+            (run_lane_change(params, mid, with_esc, nullptr) ? bad : good) = mid;
         }
     }
-    if (telemetry) run_lane_change(params, good, telemetry);
+    if (telemetry) run_lane_change(params, good, with_esc, telemetry);
     m.result = good / kmh;
     return m;
 }
@@ -397,6 +399,7 @@ const char* maneuver_id(Maneuver maneuver) {
     case Maneuver::top_speed: return "top_speed";
     case Maneuver::skidpad: return "skidpad";
     case Maneuver::lane_change: return "lane_change";
+    case Maneuver::lane_change_esc: return "lane_change_esc";
     }
     return "";
 }
@@ -424,8 +427,11 @@ Measurement run_test_maneuver(Maneuver maneuver, const VehicleParams& params, st
     case Maneuver::lane_change: {
         std::optional<double> target;
         if (t.lane_change) target = *t.lane_change / kmh;
-        return find_lane_change(begin(maneuver, "Lane change (moose test)", "km/h", target), params, telemetry);
+        return find_lane_change(begin(maneuver, "Lane change (moose test)", "km/h", target), params, false, telemetry);
     }
+    case Maneuver::lane_change_esc:
+        return find_lane_change(begin(maneuver, "Lane change (moose test) with stability control", "km/h", std::nullopt),
+                                params, true, telemetry);
     }
     return {};
 }

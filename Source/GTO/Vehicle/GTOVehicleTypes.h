@@ -30,6 +30,7 @@ struct FGTODriverInput
 	int8 GearRequest = 1;      // -1 reverse, 0 neutral, 1 drive (the automatic picks the forward gear)
 	int32 TractionControl = 0; // level 0 (off) … 5
 	bool bAbs = false;         // ABS of the physics package switched on
+	bool bStabilityControl = false; // stability control (ESC) of the physics package switched on
 	bool bHuman = false;       // from keyboard or gamepad: goes through the input smoothing; test drivers do not
 };
 

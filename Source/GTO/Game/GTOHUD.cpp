@@ -41,6 +41,12 @@ namespace
 	{
 		return bOn ? TEXT("ABS on") : TEXT("ABS off");
 	}
+
+	/** ESC on or off. */
+	FString FormatStabilityControl(bool bOn)
+	{
+		return bOn ? TEXT("ESC on") : TEXT("ESC off");
+	}
 }
 
 void AGTOHUD::DrawHUD()
@@ -89,7 +95,7 @@ void AGTOHUD::DrawLapTimes(const FGTOLapTimer& LapTimer)
 void AGTOHUD::DrawDriveInfo(const AGTOVehiclePawn& Vehicle)
 {
 	const FGTOVehicleState State = Vehicle.GetSim()->GetLatestState();
-	const FString Line = FString::Printf(TEXT("%3.0f km/h    %s    %s    %s"), FMath::Abs(State.Chassis.GetForwardSpeed()) * KmhPerMps, *FormatGear(State.Gear), *FormatTractionControl(Vehicle.GetTractionControl()), *FormatAbs(Vehicle.IsAbsOn()));
+	const FString Line = FString::Printf(TEXT("%3.0f km/h    %s    %s    %s    %s"), FMath::Abs(State.Chassis.GetForwardSpeed()) * KmhPerMps, *FormatGear(State.Gear), *FormatTractionControl(Vehicle.GetTractionControl()), *FormatAbs(Vehicle.IsAbsOn()), *FormatStabilityControl(Vehicle.IsStabilityControlOn()));
 	UFont* Font = GEngine->GetMediumFont();
 	constexpr float Scale = 1.5f;
 	float Width = 0.f, Height = 0.f;
@@ -109,7 +115,7 @@ void AGTOHUD::DrawTelemetry(const AGTOVehiclePawn& Vehicle)
 	TArray<FString> Lines;
 	Lines.Add(FString::Printf(TEXT("Physics  %.0f steps/s  (fixed step %.0f/s)"), Sim->GetTicksPerSecond(), 1.0 / UPhysicsSettings::Get()->AsyncFixedTimeStepSize));
 	Lines.Add(FString::Printf(TEXT("Speed  %.1f km/h"), Speed * KmhPerMps));
-	Lines.Add(FString::Printf(TEXT("Input  steer %+.2f  throttle %.2f  brake %.2f  handbrake %.2f  gear request %d  %s  %s"), Input.Steer, Input.Throttle, Input.Brake, Input.Handbrake, Input.GearRequest, *FormatTractionControl(Input.TractionControl), *FormatAbs(Input.bAbs)));
+	Lines.Add(FString::Printf(TEXT("Input  steer %+.2f  throttle %.2f  brake %.2f  handbrake %.2f  gear request %d  %s  %s  %s"), Input.Steer, Input.Throttle, Input.Brake, Input.Handbrake, Input.GearRequest, *FormatTractionControl(Input.TractionControl), *FormatAbs(Input.bAbs), *FormatStabilityControl(Input.bStabilityControl)));
 	Lines.Add(FString::Printf(TEXT("Engine  %.0f rpm  gear %s"), State.EngineSpeed * RpmPerRadPerSecond, *FormatGear(State.Gear)));
 	Lines.Add(TEXT(""));
 	Lines.Add(TEXT("Wheel     Load     Travel    Spin       Slip    Angle       Fx        Fy     Grip"));

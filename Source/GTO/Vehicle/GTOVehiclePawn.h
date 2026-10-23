@@ -62,6 +62,9 @@ public:
 	/** Whether the player has ABS switched on. */
 	bool IsAbsOn() const { return bAbs; }
 
+	/** Whether the player has the stability control switched on. */
+	bool IsStabilityControlOn() const { return bStabilityControl; }
+
 	/** The level the traction control key switches on. */
 	static constexpr int32 DefaultTractionControl = 2;
 
@@ -77,6 +80,7 @@ private:
 	FGTODriverInput ReadDriverInput() const;
 	void ToggleTractionControl();
 	void ToggleAbs();
+	void ToggleStabilityControl();
 	void ToggleTelemetry();
 	void Quit();
 
@@ -130,6 +134,7 @@ private:
 
 	int32 TractionControl = DefaultTractionControl;
 	bool bAbs = true; // on from the start, as in GT6
+	bool bStabilityControl = false; // off from the start, so a drift stays possible
 
 	FGTOBrakeToReverse BrakeToReverse;
 

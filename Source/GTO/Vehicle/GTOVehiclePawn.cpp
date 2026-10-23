@@ -291,6 +291,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	UInputAction* ResetAction = MakeButtonAction(this, TEXT("IA_Reset"));
 	UInputAction* TractionControlAction = MakeButtonAction(this, TEXT("IA_ToggleTractionControl"));
 	UInputAction* AbsAction = MakeButtonAction(this, TEXT("IA_ToggleAbs"));
+	UInputAction* StabilityControlAction = MakeButtonAction(this, TEXT("IA_ToggleStabilityControl"));
 	UInputAction* TelemetryAction = MakeButtonAction(this, TEXT("IA_ToggleTelemetry"));
 	UInputAction* QuitAction = MakeButtonAction(this, TEXT("IA_Quit"));
 	SteerAction = MakeAxisAction(this, TEXT("IA_Steer"), EInputActionAccumulationBehavior::Cumulative); // left and right keys cancel out
@@ -321,6 +322,8 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	InputMapping->MapKey(TractionControlAction, EKeys::Gamepad_DPad_Up);
 	InputMapping->MapKey(AbsAction, EKeys::B);
 	InputMapping->MapKey(AbsAction, EKeys::Gamepad_DPad_Left);
+	InputMapping->MapKey(StabilityControlAction, EKeys::V);
+	InputMapping->MapKey(StabilityControlAction, EKeys::Gamepad_DPad_Right);
 	InputMapping->MapKey(TelemetryAction, EKeys::T);
 	InputMapping->MapKey(TelemetryAction, EKeys::Gamepad_Special_Left);
 	InputMapping->MapKey(QuitAction, EKeys::Escape);
@@ -330,6 +333,7 @@ void AGTOVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	Input->BindAction(ResetAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ResetToStart);
 	Input->BindAction(TractionControlAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleTractionControl);
 	Input->BindAction(AbsAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleAbs);
+	Input->BindAction(StabilityControlAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleStabilityControl);
 	Input->BindAction(TelemetryAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::ToggleTelemetry);
 	Input->BindAction(QuitAction, ETriggerEvent::Started, this, &AGTOVehiclePawn::Quit);
 	for (const UInputAction* Action : { SteerAction.Get(), ThrottleAction.Get(), BrakeAction.Get(), HandbrakeAction.Get() })
@@ -361,6 +365,7 @@ FGTODriverInput AGTOVehiclePawn::ReadDriverInput() const
 	Driver.Handbrake = FMath::Clamp(Value(HandbrakeAction), 0.f, 1.f);
 	Driver.TractionControl = TractionControl;
 	Driver.bAbs = bAbs;
+	Driver.bStabilityControl = bStabilityControl;
 	Driver.bHuman = true;
 	return Driver;
 }
@@ -373,6 +378,11 @@ void AGTOVehiclePawn::ToggleTractionControl()
 void AGTOVehiclePawn::ToggleAbs()
 {
 	bAbs = !bAbs;
+}
+
+void AGTOVehiclePawn::ToggleStabilityControl()
+{
+	bStabilityControl = !bStabilityControl;
 }
 
 void AGTOVehiclePawn::ToggleTelemetry()

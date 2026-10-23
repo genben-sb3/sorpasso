@@ -353,6 +353,73 @@ double abs_min_wheel_speed(double peak, double r, double v) {
     return wheel_speed_at_slip(-peak, r, v); // brake slip is negative
 }
 
+// Stability control: it compares the target yaw rate of the driver's wish (single-track model,
+// limited to what the grip allows) with the actual yaw rate. If the car turns more than wanted
+// (oversteer), it brakes the outer front wheel; if it turns less (understeer), the inner rear
+// wheel. Both times it takes throttle away. The intervention is stateless and proportional to
+// the deviation above a dead zone, so it does not oscillate and stays quiet in the normal range.
+// Below the minimum speed it does not intervene.
+constexpr double esc_min_speed = 20.0 * kmh;            // m/s
+constexpr double esc_grip_share = 0.95;                 // 1, share of the peak friction the target uses
+constexpr double esc_dead_zone_over = 0.02;             // rad/s
+constexpr double esc_dead_zone_over_relative = 0.05;    // 1, share of the target yaw rate
+constexpr double esc_dead_zone_under = 0.10;            // rad/s
+constexpr double esc_dead_zone_under_relative = 0.2;    // 1, share of the target yaw rate
+constexpr double esc_brake_over = 15000.0;              // N·m per rad/s of deviation
+constexpr double esc_brake_under = 6000.0;              // N·m per rad/s of deviation
+constexpr double esc_throttle_end = 0.5;                // rad/s of deviation at which the throttle is fully off
+constexpr double esc_dead_zone_slip = 0.05;             // rad of body slip angle without intervention
+constexpr double esc_slip_weight = 4.0;                 // rad/s per rad of body slip angle above the dead zone
+constexpr double esc_slip_longitudinal_min = 1.0;       // m/s, against the jump of the angle at standstill
+
+struct Stabilization {
+    std::array<double, wheel_count> brake_torque{}; // N·m extra per wheel
+    double throttle_factor = 1.0;                   // 1
+};
+
+Stabilization stabilize(const VehicleParams& k, const BodyMotion& body, double front_steer_angle) {
+    Stabilization st;
+    const Vec3 forward = rotate(body.orientation, {1.0, 0.0, 0.0});
+    const double v = dot(body.velocity, forward); // m/s
+    if (v < esc_min_speed) return st;
+    const double wheelbase = k.front.x - k.rear.x; // m, > 0 by the vehicle file (front lies ahead of rear)
+    const double limit = esc_grip_share * lateral_acceleration_limit(k.front.tire.peak_friction) / v; // rad/s
+    const double kinematic = std::abs(v * std::tan(front_steer_angle) / wheelbase);             // rad/s
+    const double target = std::copysign(std::min(kinematic, limit), front_steer_angle);          // rad/s, positive left
+    const double actual = dot(body.angular_velocity, rotate(body.orientation, {0.0, 0.0, 1.0})); // rad/s
+
+    // Body slip angle: if the rear runs wide, the velocity points to the outside of the corner
+    // (sign against the yaw rate). That catches the drift in which the driver counter-steers and
+    // target and actual yaw rate therefore agree.
+    const Vec3 v_vehicle = rotate_inverse(body.orientation, body.velocity);          // m/s
+    const double slip = drift_angle(v_vehicle, esc_slip_longitudinal_min);            // rad, positive left
+    const double direction = std::copysign(1.0, std::abs(actual) > std::abs(target) ? actual : target); // 1, corner direction
+    const double slip_deviation = // rad/s
+        esc_slip_weight * (std::max(-direction * slip, 0.0) - esc_dead_zone_slip);
+
+    double deviation = 0.0; // rad/s above the dead zone
+    const double yaw_direction = std::copysign(1.0, actual); // 1
+    const double over_yaw = // rad/s
+        std::abs(actual) > std::abs(target)
+            ? yaw_direction * actual - (yaw_direction * target > 0.0 ? yaw_direction * target : 0.0) - esc_dead_zone_over -
+                  esc_dead_zone_over_relative * std::abs(target)
+            : 0.0;
+    if (over_yaw > 0.0 || slip_deviation > 0.0) { // oversteer: turns more than wanted or the rear pushes out
+        deviation = std::max(over_yaw, slip_deviation);
+        st.brake_torque[direction > 0.0 ? front_right : front_left] = esc_brake_over * deviation;
+    } else if (std::abs(actual) < std::abs(target)) { // understeer: turns less than wanted
+        const double s = std::copysign(1.0, target);   // 1
+        const double under = std::abs(target) - s * actual; // rad/s
+        deviation = under - esc_dead_zone_under - esc_dead_zone_under_relative * std::abs(target);
+        if (deviation <= 0.0) return st;
+        st.brake_torque[s > 0.0 ? rear_left : rear_right] = esc_brake_under * deviation;
+    } else {
+        return st;
+    }
+    st.throttle_factor = 1.0 - std::clamp(deviation / esc_throttle_end, 0.0, 1.0);
+    return st;
+}
+
 } // namespace
 
 State rolling_state(const VehicleParams& params, double speed) {
@@ -399,12 +466,19 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
             spring_force(mounts[i].axle->suspension, compressions[i].compression, compressions[i].speed);
     }
 
+    Stabilization stability;
+    if (input.driving_aids.stability_control) stability = stabilize(params, body, front_steer_angle);
+
     std::array<WheelSetup, wheel_count> wheels;
     for (int i = 0; i < wheel_count; ++i) {
         WheelSetup& wheel = wheels[i];
         wheel.axle = mounts[i].axle;
         const double axle_share = front_wheel(i) ? params.brakes.balance : 1.0 - params.brakes.balance; // 1
-        wheel.brake_torque = input.brake * params.brakes.torque * axle_share / 2.0;
+        const double full_brake_torque = params.brakes.torque * axle_share / 2.0; // N·m with the brake fully applied
+        const double driver_brake_torque = input.brake * full_brake_torque;     // N·m
+        // The stability control adds to the driver's brake, at most up to the full brake.
+        wheel.brake_torque = std::min(driver_brake_torque + stability.brake_torque[i],
+                                      std::max(driver_brake_torque, full_brake_torque));
 
         const WheelContact& contact = contacts[i];
         if (!contact.contact) {
@@ -501,7 +575,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     for (int step = 0; step < substeps; ++step) {
         // During an automatic shift the automatic closes the throttle.
         double throttle = automatic && result.state.shift_remaining > 0.0 ? 0.0 : input.throttle; // 1
-        throttle *= result.state.traction_factor;
+        throttle *= result.state.traction_factor * stability.throttle_factor;
         engine_speed += h * engine_torque(drivetrain.engine, engine_speed, throttle) / drivetrain.engine.inertia;
         engine_speed = std::max(engine_speed, 0.0);
         for (int i = 0; i < wheel_count; ++i) result.state.wheel_angle[i] += h * result.state.wheel_speed[i];

@@ -81,6 +81,7 @@ namespace
 		Raw.gear_request = Input.GearRequest;
 		Raw.driving_aids.traction_control = FMath::Clamp(Input.TractionControl, 0, ultragravity::traction_control_max);
 		Raw.driving_aids.abs = Input.bAbs;
+		Raw.driving_aids.stability_control = Input.bStabilityControl;
 		return Raw;
 	}
 

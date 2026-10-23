@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 // Small vector and quaternion math. SI units, axes per ISO 8855
@@ -10,6 +11,8 @@ struct Vec3 {
     double x = 0.0; // unit of the quantity
     double y = 0.0; // unit of the quantity
     double z = 0.0; // unit of the quantity
+
+    bool operator==(const Vec3&) const = default;
 };
 
 constexpr Vec3 operator+(Vec3 a, Vec3 b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
@@ -31,6 +34,8 @@ struct Quat {
     double x = 0.0; // 1
     double y = 0.0; // 1
     double z = 0.0; // 1
+
+    bool operator==(const Quat&) const = default;
 };
 
 constexpr Quat operator*(Quat a, Quat b) {
@@ -60,6 +65,10 @@ constexpr Vec3 rotate_inverse(Quat q, Vec3 v) { return rotate({q.w, -q.x, -q.y, 
 // Magnitude of the drift angle in rad (0 to π/2): angle between the longitudinal axis and the
 // direction of motion, v in the vehicle frame.
 inline double drift_angle_magnitude(Vec3 v) { return std::atan2(std::abs(v.y), std::abs(v.x)); }
+
+// Signed drift angle in rad (positive to the left), v in the vehicle frame. The longitudinal speed is
+// bounded below by longitudinal_min (m/s), so the angle stays finite at standstill and in reverse.
+inline double drift_angle(Vec3 v, double longitudinal_min) { return std::atan2(v.y, std::max(v.x, longitudinal_min)); }
 
 // Angular acceleration of a rigid body by Euler's equations about its principal axes. Orientation,
 // angular velocity and torque as in BodyMotion (world frame), the principal moments of inertia in the

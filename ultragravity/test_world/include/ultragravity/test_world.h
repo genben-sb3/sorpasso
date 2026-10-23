@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "ultragravity/input.h"
+#include "ultragravity/units.h"
 #include "ultragravity/vehicle_file.h"
 #include "ultragravity/vehicle_step.h"
 
@@ -30,7 +31,7 @@ struct TestGround {
 class TestWorld {
 public:
     static constexpr double time_step = 1.0 / 120.0; // s
-    static constexpr double gravity = 9.81;          // m/s²
+    static constexpr double gravity = ultragravity::gravity; // m/s²
 
     // Sets the car down level, with the wheels hanging drop_height above the ground.
     // With a speed it rolls straight ahead in the X direction.

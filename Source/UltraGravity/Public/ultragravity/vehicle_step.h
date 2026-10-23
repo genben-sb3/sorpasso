@@ -24,6 +24,8 @@ struct BodyMotion {
     Quat orientation;
     Vec3 velocity;
     Vec3 angular_velocity;
+
+    bool operator==(const BodyMotion&) const = default;
 };
 
 // The ray with which the environment probes the ground under a wheel:
