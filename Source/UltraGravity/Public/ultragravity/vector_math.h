@@ -57,6 +57,10 @@ constexpr Vec3 rotate(Quat q, Vec3 v) {
 // Rotates v from the world frame into the vehicle frame.
 constexpr Vec3 rotate_inverse(Quat q, Vec3 v) { return rotate({q.w, -q.x, -q.y, -q.z}, v); }
 
+// Magnitude of the drift angle in rad (0 to π/2): angle between the longitudinal axis and the
+// direction of motion, v in the vehicle frame.
+inline double drift_angle_magnitude(Vec3 v) { return std::atan2(std::abs(v.y), std::abs(v.x)); }
+
 // Angular acceleration of a rigid body by Euler's equations about its principal axes. Orientation,
 // angular velocity and torque as in BodyMotion (world frame), the principal moments of inertia in the
 // vehicle frame; the result in the world frame.

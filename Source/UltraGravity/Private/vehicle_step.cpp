@@ -280,14 +280,6 @@ double equalizing_impulse(double difference, // rad/s
 bool is_reverse(int gear) { return gear < 0; }
 bool is_forward(int gear) { return gear > 0; }
 
-// Overall ratio from the engine to the wheels; negative in reverse, so the
-// engine turns the wheels backward.
-double overall_ratio(const Drivetrain& d, int gear) {
-    if (is_forward(gear)) return d.gearbox.ratios[gear - 1] * d.gearbox.final_drive;
-    if (is_reverse(gear)) return -d.gearbox.reverse_ratio * d.gearbox.final_drive;
-    return 0.0;
-}
-
 // The gear the automatic picks next. It works with the engine speed that
 // belongs to the speed over ground: spinning wheels do not push it into the
 // next gear. In a drift it holds the gear.
@@ -306,11 +298,11 @@ int automatic_gear(const State& state, const VehicleParams& k, double brake, Vec
     const double vx = vehicle_velocity.x; // m/s
     const double vy = vehicle_velocity.y; // m/s
     constexpr double drift_speed = 2.0;   // m/s, below this there is no drift angle
-    if (std::hypot(vx, vy) > drift_speed && std::atan2(std::abs(vy), std::abs(vx)) > au.drift_angle) {
+    if (std::hypot(vx, vy) > drift_speed && drift_angle_magnitude({vx, vy, 0.0}) > au.drift_angle) {
         return gear;
     }
 
-    const auto ground_speed = [&](int g) { return std::abs(vx) / radius * overall_ratio(d, g); }; // rad/s
+    const auto ground_speed = [&](int g) { return std::abs(vx) / radius * overall_ratio(d.gearbox, g); }; // rad/s
     if (gear < gears && !braking && ground_speed(gear) > au.upshift_speed) return gear + 1;
     const double down = braking ? au.brake_downshift_speed : au.downshift_speed; // rad/s
     if (gear > 1 && ground_speed(gear) < down && ground_speed(gear - 1) < au.upshift_speed) {
@@ -466,7 +458,7 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         result.state.shift_remaining = drivetrain.gearbox.shift_time;
         result.state.gear_age = 0.0;
     }
-    const double ratio = overall_ratio(drivetrain, result.state.gear); // 1
+    const double ratio = overall_ratio(drivetrain.gearbox, result.state.gear); // 1
     double& engine_speed = result.state.engine_speed;
     result.state.traction_factor =
         traction_factor(state.traction_factor, input.driving_aids.traction_control, driven,

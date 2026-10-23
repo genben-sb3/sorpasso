@@ -2,11 +2,13 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 
 #include "ultragravity/input.h"
 #include "ultragravity/test_world.h"
 #include "ultragravity/units.h"
 #include "ultragravity/vehicle_file.h"
+#include "ultragravity/vehicle_step.h"
 
 namespace ultragravity {
 
@@ -39,6 +41,29 @@ private:
     int gear_ = 1;          // 1, gear engaged by the driver
     double time_ = 0.0;     // s since the start of pulling away
     double shifted_ = -1e9; // s, time of the last gear change
+};
+
+// The steering controller of the test driver: it only reads the body motion (position, heading),
+// as a driver sees the road ahead, and returns the steering (-1 right … 1 left) for the
+// input packet. It does not call the input smoothing.
+class SteeringController {
+public:
+    explicit SteeringController(const VehicleParams& k);
+
+    // Holds a left-hand circle about the point (0, radius). Time step: TestWorld::time_step.
+    double circle(const BodyMotion& body, double radius); // radius in m
+
+    // Follows the path y = target_y(x) (m) like a driver who aims at a point `lookahead` m ahead.
+    double path(const BodyMotion& body, const std::function<double(double)>& target_y,
+                double lookahead); // lookahead in m
+
+    // Distance of the body from the circle, positive outside, in m.
+    static double circle_error(const BodyMotion& body, double radius);
+
+private:
+    double wheelbase_;       // m
+    double max_steer_angle_; // rad
+    double integral_ = 0.0;  // m·s, circle error over time
 };
 
 } // namespace ultragravity

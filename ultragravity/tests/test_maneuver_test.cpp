@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "drive.h"
+#include "ultragravity/test_driver.h"
 #include "ultragravity/test_maneuver.h"
 #include "ultragravity/units.h"
 
@@ -212,4 +213,116 @@ TEST_CASE("The sports coupe carries target values for all straight test maneuver
     CHECK(t.acceleration_0_200.has_value());
     CHECK(t.braking_100_0.has_value());
     CHECK(t.top_speed.has_value());
+}
+
+namespace {
+
+VehicleParams with_grip(double factor) {
+    VehicleParams car = sports_coupe();
+    car.front.tire.peak_friction *= factor;
+    car.rear.tire.peak_friction *= factor;
+    return car;
+}
+
+} // namespace
+
+TEST_CASE("The skidpad yields the lateral acceleration from speed and radius of the drive") {
+    std::ostringstream csv;
+
+    const Measurement m = run_test_maneuver(Maneuver::skidpad, sports_coupe(), &csv);
+
+    REQUIRE_FALSE(m.failed());
+    CHECK(m.unit == "g");
+    const Trace t = read_trace(csv.str());
+    const double fastest = *std::max_element(t.speed.begin(), t.speed.end()); // m/s
+    const double highest = fastest * fastest / 100.0 / TestWorld::gravity;    // g
+    // The result is a one-second mean with the radius inside the tolerance, so just below the peak.
+    // measured: 1.137 g against 1.234 g peak (×0.92), band: 0.9 to 1.02
+    CHECK(*m.result <= highest * 1.02);
+    CHECK(*m.result >= highest * 0.9);
+}
+
+TEST_CASE("The skidpad raises the speed up to the limit, not until the time runs out") {
+    std::ostringstream csv;
+
+    run_test_maneuver(Maneuver::skidpad, sports_coupe(), &csv);
+
+    const Trace t = read_trace(csv.str());
+    // measured: 34.8 m/s at the end against 27.4 m/s at half time (×1.27), band: at least 1.1
+    CHECK(t.speed.back() > t.speed[t.speed.size() / 2] * 1.1);
+    // measured: 61.5 s, band: < 77 s (×1.25)
+    CHECK(static_cast<double>(t.speed.size()) * TestWorld::time_step < 77.0);
+}
+
+TEST_CASE("A car with more tire grip reaches more g on the skidpad") {
+    const Measurement normal = run_test_maneuver(Maneuver::skidpad, sports_coupe());
+    const Measurement sticky = run_test_maneuver(Maneuver::skidpad, with_grip(1.2));
+
+    REQUIRE_FALSE(normal.failed());
+    REQUIRE_FALSE(sticky.failed());
+    // measured: 1.328 g against 1.137 g (+17 %), band: at least +10 %
+    CHECK(*sticky.result > *normal.result * 1.1);
+}
+
+TEST_CASE("The steering controller measures the circle error from the center of the circle") {
+    BodyMotion b;
+    b.position = {0.0, 0.0, 0.0};
+    CHECK(SteeringController::circle_error(b, 100.0) == doctest::Approx(0.0));
+    b.position = {100.0, 100.0, 0.0};
+    CHECK(SteeringController::circle_error(b, 100.0) == doctest::Approx(0.0));
+    b.position = {0.0, 210.0, 0.0};
+    CHECK(SteeringController::circle_error(b, 100.0) == doctest::Approx(10.0)); // outside
+    b.position = {0.0, 20.0, 0.0};
+    CHECK(SteeringController::circle_error(b, 100.0) == doctest::Approx(-20.0)); // inside
+}
+
+TEST_CASE("The steering controller follows a path to the left when it lies left and to the right when it lies right") {
+    SteeringController steer(sports_coupe());
+    BodyMotion b;
+    b.orientation = {1.0, 0.0, 0.0, 0.0};
+    b.velocity = {20.0, 0.0, 0.0};
+
+    const double left = steer.path(b, [](double) { return 1.0; }, 10.0);
+    const double right = steer.path(b, [](double) { return -1.0; }, 10.0);
+    const double straight = steer.path(b, [](double) { return 0.0; }, 10.0);
+
+    CHECK(left > 0.0);
+    CHECK(right == doctest::Approx(-left));
+    CHECK(straight == doctest::Approx(0.0));
+}
+
+TEST_CASE("The lane change finds an entry speed a human calls sensible") {
+    const Measurement m = run_test_maneuver(Maneuver::lane_change, sports_coupe());
+
+    REQUIRE_FALSE(m.failed());
+    CHECK(m.unit == "km/h");
+    // measured: 105.0 km/h, band: 70 to 130 km/h (moose test results lie at 80 to 110 km/h)
+    CHECK(*m.result > 70.0);
+    CHECK(*m.result < 130.0);
+}
+
+TEST_CASE("A car with less tire grip passes the lane change only slower") {
+    const Measurement normal = run_test_maneuver(Maneuver::lane_change, sports_coupe());
+    const Measurement slippery = run_test_maneuver(Maneuver::lane_change, with_grip(0.7));
+
+    REQUIRE_FALSE(normal.failed());
+    REQUIRE_FALSE(slippery.failed());
+    // measured: 86.9 km/h against 105.0 km/h (×0.83), band: at most 0.9
+    CHECK(*slippery.result < *normal.result * 0.9);
+}
+
+TEST_CASE("A lane change the car fails already at the lowest speed gives the reason") {
+    // Peak friction 0.15 (0.12 × 1.25): the friction of the package test, which ran a car with 1.05.
+    const Measurement m = run_test_maneuver(Maneuver::lane_change, with_grip(0.12));
+
+    // measured: fails at 40 km/h, the car leaves the lane after 32 m
+    CHECK(m.failed());
+    CHECK(m.reason.find("already at 40 km/h") != std::string::npos);
+}
+
+TEST_CASE("The vehicle file carries target values for skidpad and lane change") {
+    const TargetValues& t = sports_coupe().target_values;
+
+    CHECK(t.skidpad.has_value());
+    CHECK(t.lane_change.has_value());
 }

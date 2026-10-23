@@ -83,7 +83,9 @@
     "acceleration_0_100_s": 5.5,
     "acceleration_0_200_s": 18.0,
     "braking_distance_100_0_m": 38.0,
-    "top_speed_kmh": 270.0
+    "top_speed_kmh": 270.0,
+    "skidpad_g": 1.0,
+    "lane_change_kmh": 100.0
   },
   "drivetrain": {
     "layout": "rear",

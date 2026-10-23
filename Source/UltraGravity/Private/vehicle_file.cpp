@@ -171,6 +171,8 @@ TargetValues read_target_values(Reader& reader, const json& root) {
     t.acceleration_0_200 = reader.optional_number(o, path, "acceleration_0_200_s");
     t.braking_100_0 = reader.optional_number(o, path, "braking_distance_100_0_m");
     if (const auto v = reader.optional_number(o, path, "top_speed_kmh")) t.top_speed = *v * kmh;
+    t.skidpad = reader.optional_number(o, path, "skidpad_g");
+    if (const auto v = reader.optional_number(o, path, "lane_change_kmh")) t.lane_change = *v * kmh;
     return t;
 }
 
@@ -457,6 +459,8 @@ std::optional<LoadError> check(const VehicleParams& k) {
     target_positive(k.target_values.acceleration_0_200, "acceleration_0_200_s");
     target_positive(k.target_values.braking_100_0, "braking_distance_100_0_m");
     target_positive(k.target_values.top_speed, "top_speed_kmh");
+    target_positive(k.target_values.skidpad, "skidpad_g");
+    target_positive(k.target_values.lane_change, "lane_change_kmh");
     // Up to 60° the lock stays far away from turning the wheel sideways.
     p.positive(k.steering.max_steer_angle, "steering.max_steer_angle_deg");
     p.at_most(k.steering.max_steer_angle / deg, 60.0, "steering.max_steer_angle_deg");

@@ -10,13 +10,17 @@
 
 namespace ultragravity {
 
-// The test maneuvers. The braking distance is driven without ABS.
-enum class Maneuver { acceleration_0_100, acceleration_0_200, braking_100_0, top_speed };
+// The test maneuvers. The braking distance is driven without ABS. The skidpad (100 m radius,
+// result: highest steady lateral acceleration in g) and the lane change in the style of the
+// moose test (ISO 3888-2, result: highest entry speed without a spin or leaving the lane)
+// need the steering controller of the test driver.
+enum class Maneuver { acceleration_0_100, acceleration_0_200, braking_100_0, top_speed, skidpad, lane_change };
 
-inline constexpr std::array<Maneuver, 4> all_maneuvers{Maneuver::acceleration_0_100, Maneuver::acceleration_0_200,
-                                                       Maneuver::braking_100_0, Maneuver::top_speed};
+inline constexpr std::array<Maneuver, 6> all_maneuvers{Maneuver::acceleration_0_100, Maneuver::acceleration_0_200,
+                                                       Maneuver::braking_100_0,      Maneuver::top_speed,
+                                                       Maneuver::skidpad,            Maneuver::lane_change};
 
-// Result of a test maneuver. Result and target are in the unit `unit` (s, m or km/h).
+// Result of a test maneuver. Result and target are in the unit `unit` (s, m, km/h or g).
 // A failed maneuver has no result, but a reason.
 struct Measurement {
     Maneuver maneuver = Maneuver::acceleration_0_100;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -109,6 +110,14 @@ struct Gearbox {
     Automatic automatic;        // only read in mode automatic
 };
 
+// Overall ratio from the engine to the wheels in a gear (-1 reverse, 0 neutral, 1 … n forward);
+// negative in reverse, so the engine turns the wheels backward.
+inline double overall_ratio(const Gearbox& g, int gear) {
+    if (gear > 0) return g.ratios[static_cast<std::size_t>(gear - 1)] * g.final_drive;
+    if (gear < 0) return -g.reverse_ratio * g.final_drive;
+    return 0.0;
+}
+
 enum class DriveLayout { rear, front, all_wheel };
 
 // Clutch-pack limited-slip differential: the locking keeps the wheels of an
@@ -140,6 +149,8 @@ struct TargetValues {
     std::optional<double> acceleration_0_200; // s
     std::optional<double> braking_100_0;      // m, without ABS
     std::optional<double> top_speed;          // m/s
+    std::optional<double> skidpad;            // g, highest steady lateral acceleration on a 100 m radius
+    std::optional<double> lane_change;        // m/s, highest entry speed in the lane change
 };
 
 // All parameters of a car. All positions are in the same vehicle frame
