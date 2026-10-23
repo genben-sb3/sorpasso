@@ -133,7 +133,7 @@ TEST_CASE("A car turned at standstill stops turning without its yaw rate flippin
 
     CHECK(yaw_rate.longest_run() < 3); // measured: 0 (118 with the yaw rate fixed over the tick), band: < 3
     // A wide band: the flipping yaw rate keeps 4.9e-3 rad/s after the second.
-    CHECK(std::abs(world.body().angular_velocity.z) < 1e-4); // measured: 4e-12 rad/s, band: < 1e-4 rad/s
+    CHECK(std::abs(world.body().angular_velocity.z) < 1e-4); // measured: 2e-12 rad/s, band: < 1e-4 rad/s
 }
 
 TEST_CASE("Two runs with the same input packets yield the same checksum") {

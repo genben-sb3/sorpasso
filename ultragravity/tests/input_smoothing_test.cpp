@@ -114,12 +114,13 @@ TEST_CASE("At high speed a full key press does not steer beyond the grip") {
     }
     CAPTURE(highest_lateral);
     CAPTURE(highest_drift);
-    CHECK(steering_limit(car, speed, SmoothingParams{}.peak_fraction) < 0.3); // measured: 0.21, band: < 0.3
+    CHECK(steering_limit(car, speed, SmoothingParams{}.peak_fraction) < 0.3); // measured: 0.22, band: < 0.3
     // Friction circle: a little above μ·g is possible thanks to downforce and load sensitivity.
-    // The turn-in jolt overshoots briefly (inertia, relaxation), hence 1.3 instead of 1.05.
-    CHECK(highest_lateral < 1.3 * 1.05 * TestWorld::gravity); // measured: 1.24·1.05·g, band: < 1.3·1.05·g
+    // The turn-in jolt overshoots briefly (inertia, relaxation), hence 1.3·μ·g instead of 1.05·μ·g.
+    const double grip = car.front.tire.peak_friction * TestWorld::gravity; // m/s²
+    CHECK(highest_lateral < 1.3 * grip); // measured: 1.23·grip, band: < 1.3·grip
     // A spin goes toward 90° and more; here the car catches itself.
-    CHECK(highest_drift < 0.5); // measured: 0.35 rad, band: < 0.5 rad
+    CHECK(highest_drift < 0.5); // measured: 0.31 rad, band: < 0.5 rad
 }
 
 TEST_CASE("If the rear slides and the steering key is released, the countersteer aid steers in the direction of travel") {

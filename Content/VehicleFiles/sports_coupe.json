@@ -19,7 +19,7 @@
         "anti_roll_bar": 25000.0
       },
       "tire": {
-        "peak_friction": 1.05,
+        "peak_friction": 1.25,
         "nominal_load": 3400.0,
         "load_sensitivity": 0.1,
         "inertia": 1.2,
@@ -53,7 +53,7 @@
         "anti_roll_bar": 12000.0
       },
       "tire": {
-        "peak_friction": 1.05,
+        "peak_friction": 1.25,
         "nominal_load": 3200.0,
         "load_sensitivity": 0.1,
         "inertia": 1.2,

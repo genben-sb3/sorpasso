@@ -81,7 +81,7 @@ TEST_CASE("The top speed lies where drive force and driving resistance are in ba
     CAPTURE(v * 3.6);
     CAPTURE(expected * 3.6);
     // The tires lose some slip to the drive force along the way; 2 % covers that.
-    CHECK(v == doctest::Approx(expected).epsilon(0.02)); // measured: -0.66 %, band: ±2 %
+    CHECK(v == doctest::Approx(expected).epsilon(0.02)); // measured: -0.54 %, band: ±2 %
     // Without more power it gets no faster: the acceleration is gone.
     const double v_before = v;
     drive.run(5.0, full_throttle);
