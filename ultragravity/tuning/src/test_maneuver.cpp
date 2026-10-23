@@ -149,7 +149,7 @@ Measurement accelerate(Measurement m, const VehicleParams& params, double target
                        " km/h reached, " + number(target_speed / kmh, 0) + " km/h not");
 }
 
-Measurement brake(Measurement m, const VehicleParams& params, std::ostream* telemetry) {
+Measurement brake(Measurement m, const VehicleParams& params, bool with_abs, std::ostream* telemetry) {
     constexpr double from = 100.0 * kmh; // m/s
     Run run(params, braking_run_up, telemetry);
     InputPacket rolling;
@@ -159,7 +159,7 @@ Measurement brake(Measurement m, const VehicleParams& params, std::ostream* tele
 
     InputPacket braking = rolling;
     braking.brake = 1.0;
-    braking.driving_aids.abs = false;
+    braking.driving_aids.abs = with_abs;
     const double brake_start = run.time(); // s
     std::optional<double> start_position;  // m, where the speed drops below 100 km/h
     while (run.time() - brake_start < braking_at_most) {
@@ -393,6 +393,7 @@ const char* maneuver_id(Maneuver maneuver) {
     case Maneuver::acceleration_0_100: return "acceleration_0_100";
     case Maneuver::acceleration_0_200: return "acceleration_0_200";
     case Maneuver::braking_100_0: return "braking_100_0";
+    case Maneuver::braking_100_0_abs: return "braking_100_0_abs";
     case Maneuver::top_speed: return "top_speed";
     case Maneuver::skidpad: return "skidpad";
     case Maneuver::lane_change: return "lane_change";
@@ -410,7 +411,9 @@ Measurement run_test_maneuver(Maneuver maneuver, const VehicleParams& params, st
         return accelerate(begin(maneuver, "Acceleration 0–200 km/h", "s", t.acceleration_0_200), params, 200.0 * kmh,
                           telemetry);
     case Maneuver::braking_100_0:
-        return brake(begin(maneuver, "Braking 100–0 km/h without ABS", "m", t.braking_100_0), params, telemetry);
+        return brake(begin(maneuver, "Braking 100–0 km/h without ABS", "m", t.braking_100_0), params, false, telemetry);
+    case Maneuver::braking_100_0_abs:
+        return brake(begin(maneuver, "Braking 100–0 km/h with ABS", "m", std::nullopt), params, true, telemetry);
     case Maneuver::top_speed: {
         std::optional<double> target;
         if (t.top_speed) target = *t.top_speed / kmh;

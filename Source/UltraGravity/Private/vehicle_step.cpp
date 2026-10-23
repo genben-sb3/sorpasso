@@ -95,6 +95,9 @@ double slip_denominator(double v) { return std::sqrt(v * v + slip_denominator_mi
 // longitudinal speed v (m/s) at the contact point. Dimensionless.
 double slip_ratio(double omega, double r, double v) { return (omega * r - v) / slip_denominator(v); }
 
+// Inverse of slip_ratio: wheel speed in rad/s at which a wheel with wheel radius r at rolling speed v has the slip s.
+double wheel_speed_at_slip(double s, double r, double v) { return (v + s * slip_denominator(v)) / r; }
+
 // Weighting function for combined slip: 1 without the other slip,
 // drops toward zero with it.
 double weighting(double b, double slip) { return 1.0 / std::sqrt(1.0 + b * b * slip * slip); }
@@ -338,6 +341,18 @@ double traction_factor(double factor, int level, const DrivenAxles& driven,
     return factor;
 }
 
+// ABS: it sits between input packet and brakes and limits the brake impulse of a wheel so
+// that the wheel speed after the substep does not drop below the one belonging to the peak
+// slip (predictive, based on the speed after tire and drive). Below the minimum speed it
+// does not intervene.
+constexpr double abs_min_speed = 15.0 * kmh; // m/s
+constexpr double abs_slip_limit = 1.0;       // 1, search range of the peak
+
+// Wheel speed in rad/s below which a wheel with wheel radius r at rolling speed v is not braked.
+double abs_min_wheel_speed(double peak, double r, double v) {
+    return wheel_speed_at_slip(-peak, r, v); // brake slip is negative
+}
+
 } // namespace
 
 State rolling_state(const VehicleParams& params, double speed) {
@@ -479,6 +494,10 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
     const double substep_weight = 1.0 / substeps;  // 1
     Vec3 body_dv; // m/s
     Vec3 body_dw; // rad/s, world frame
+    std::array<double, wheel_count> abs_peak{}; // 1, slip of the friction maximum per wheel
+    if (input.driving_aids.abs) {
+        for (int i = 0; i < wheel_count; ++i) abs_peak[i] = peak_slip(wheels[i].axle->tire.longitudinal, abs_slip_limit);
+    }
     for (int step = 0; step < substeps; ++step) {
         // During an automatic shift the automatic closes the throttle.
         double throttle = automatic && result.state.shift_remaining > 0.0 ? 0.0 : input.throttle; // 1
@@ -490,12 +509,14 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         Vec3 total_tire_force;  // N
         Vec3 total_tire_torque; // N·m about the center of mass
         std::array<double, wheel_count> free_speed{}; // rad/s after tire and drive, before the brake
+        std::array<double, wheel_count> rolling_speed{}; // m/s, contact point in rolling direction
         for (int i = 0; i < wheel_count; ++i) {
             const WheelSetup& wheel = wheels[i];
             const double inertia = wheel.axle->tire.inertia; // kg·m²
             const double r = wheel.axle->wheel_radius;       // m
             const double omega = result.state.wheel_speed[i]; // rad/s
             const Vec3 v = wheel.contact_velocity + body_dv + cross(body_dw, wheel.lever); // m/s
+            if (wheel.contact) rolling_speed[i] = dot(v, wheel.longitudinal);
             const TireForce k = wheel.contact ? tire_force(wheel, v, omega, h, result.state.slip_angle[i]) : TireForce{};
 
             // Semi-implicit: the tire force is linearized about the new wheel speed,
@@ -557,8 +578,12 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         // The brake is a limited impulse toward standstill: if it suffices,
         // the wheel stops, otherwise it removes its full amount.
         for (int i = 0; i < wheel_count; ++i) {
-            const double brake_impulse = wheels[i].brake_torque * h / wheels[i].axle->tire.inertia; // rad/s
+            double brake_impulse = wheels[i].brake_torque * h / wheels[i].axle->tire.inertia; // rad/s
             const double unbraked = free_speed[i]; // rad/s
+            if (input.driving_aids.abs && wheels[i].contact && rolling_speed[i] > abs_min_speed) {
+                const double lowest = abs_min_wheel_speed(abs_peak[i], wheels[i].axle->wheel_radius, rolling_speed[i]); // rad/s
+                brake_impulse = std::min(brake_impulse, std::max(unbraked - lowest, 0.0));
+            }
             result.state.wheel_speed[i] =
                 std::abs(unbraked) <= brake_impulse ? 0.0 : unbraked - std::copysign(brake_impulse, unbraked);
         }

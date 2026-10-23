@@ -59,6 +59,9 @@ public:
 	/** Level of the traction control the player has chosen, 0 for off. */
 	int32 GetTractionControl() const { return TractionControl; }
 
+	/** Whether the player has ABS switched on. */
+	bool IsAbsOn() const { return bAbs; }
+
 	/** The level the traction control key switches on. */
 	static constexpr int32 DefaultTractionControl = 2;
 
@@ -73,6 +76,7 @@ private:
 	void UpdateDisplay();
 	FGTODriverInput ReadDriverInput() const;
 	void ToggleTractionControl();
+	void ToggleAbs();
 	void ToggleTelemetry();
 	void Quit();
 
@@ -125,6 +129,7 @@ private:
 	TObjectPtr<UInputAction> HandbrakeAction;
 
 	int32 TractionControl = DefaultTractionControl;
+	bool bAbs = true; // on from the start, as in GT6
 
 	FGTOBrakeToReverse BrakeToReverse;
 

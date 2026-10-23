@@ -80,6 +80,7 @@ namespace
 		Raw.handbrake = FMath::Clamp(Input.Handbrake, 0.f, 1.f);
 		Raw.gear_request = Input.GearRequest;
 		Raw.driving_aids.traction_control = FMath::Clamp(Input.TractionControl, 0, ultragravity::traction_control_max);
+		Raw.driving_aids.abs = Input.bAbs;
 		return Raw;
 	}
 
