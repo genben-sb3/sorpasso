@@ -32,6 +32,8 @@ Nicht geklärt hat der Spike, ob über 8 Substeps gemittelte Kräfte das Chassis
 
 **Nachtrag aus #4: Schnappschüsse tragen die Chaos-Pose.** Der Schnappschuss eines Schritts entsteht erst zu Beginn des nächsten Async-Ticks: Radzustände aus dem Sim-Kern, Chassis so, wie Chaos es tatsächlich bewegt hat (Kollisionen eingeschlossen), nicht die lokal vorhergesagte Pose der Substeps. Die Darstellung liegt dadurch einen Schritt (8,3 ms) weiter zurück. Startet der Rad-Cast bereits im Boden (harte Landung), gilt das als Kontakt weit jenseits des Bump-Stops statt als Rad in der Luft.
 
+**Nachtrag aus der ersten Probefahrt: Darstellung nach Zeit, nicht nach Ankünften.** Bild und Auto ruckelten beim Fahren. Die Darstellung zählte die ankommenden Schnappschüsse gegen die Framezeit und schnitt den Rest hart auf einen Schritt ab; kamen die Schritte nicht genau im Takt der Frames an (ein Frame ohne, der nächste mit doppelt so vielen), sprang das Auto um bis zu einen Schritt (bei 180 km/h gut 40 cm). Jetzt folgt die gezeigte Zeit der Framezeit und wird nur sanft (0,5 s) auf zwei Schritte hinter den neuesten Schnappschuss gezogen; dafür hält der Interpolator sechs Schnappschüsse. Das kostet gut einen Schritt (8,3 ms) mehr Verzug und fängt Schritte ab, die einen 60-fps-Frame zu spät kommen (`GTO.Vehicle.Interpolation`). Ob sie in Unreal tatsächlich ungleichmäßig ankommen, zeigt `Log LogGTOVehicleSim VeryVerbose` (Schritte pro Frame).
+
 ## Konsequenzen
 
 - **Projekteinstellungen:** `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=1/120`, `MaxPhysicsDeltaTime=0.1`. Unter 10 FPS läuft das Spiel bewusst langsamer statt in eine Nachhol-Spirale zu geraten, weil Nachhol-Schritte ebenfalls Game-Thread-Zeit kosten.

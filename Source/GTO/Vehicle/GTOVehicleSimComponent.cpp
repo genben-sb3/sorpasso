@@ -10,6 +10,8 @@
 
 using namespace GTOUnits;
 
+DEFINE_LOG_CATEGORY_STATIC(LogGTOVehicleSim, Log, All);
+
 namespace
 {
 	// Unreal's axes are those of ISO 8855 mirrored at the XZ plane (Y right instead of left). A position or velocity
@@ -140,7 +142,11 @@ void UGTOVehicleSimComponent::Restart(UPrimitiveComponent* Body, const ultragrav
 	State = ultragravity::rolling_state(Params, 0.0);
 	Smoothing = ultragravity::SmoothingState();
 	Stepped = FGTOVehicleState();
-	SteppedAnimation = PreviousAnimation = LatestAnimation = ultragravity::AnimationData();
+	SteppedAnimation = ultragravity::AnimationData();
+	for (ultragravity::AnimationData& Animation : DisplayAnimation)
+	{
+		Animation = ultragravity::AnimationData();
+	}
 	Latest = FGTOVehicleState();
 	Latest.Chassis.Position = Body->GetComponentLocation() / CmPerM;
 	Latest.Chassis.Orientation = Body->GetComponentQuat();
@@ -216,7 +222,9 @@ FGTOVehicleState UGTOVehicleSimComponent::GetDisplayState() const
 {
 	FScopeLock ScopeLock(&Lock);
 	FGTOVehicleState Shown = Display.Sample();
-	ApplyAnimation(ultragravity::interpolate(PreviousAnimation, LatestAnimation, Display.GetAlpha()), Shown);
+	const FGTOSnapshotInterpolator::FBlend Blend = Display.GetBlend();
+	ApplyAnimation(ultragravity::interpolate(DisplayAnimation[FGTOSnapshotInterpolator::Slot(Blend.From)],
+		DisplayAnimation[FGTOSnapshotInterpolator::Slot(Blend.To)], Blend.Alpha), Shown);
 	return Shown;
 }
 
@@ -248,8 +256,7 @@ void UGTOVehicleSimComponent::AsyncPhysicsTickComponent(float DeltaTime, float S
 	Latest.Chassis = ToChassis(Body);
 	LatestSimTime = NextSimTime;
 	Display.Push(Latest);
-	PreviousAnimation = LatestAnimation;
-	LatestAnimation = SteppedAnimation;
+	DisplayAnimation[FGTOSnapshotInterpolator::Slot(Display.GetNewest())] = SteppedAnimation;
 
 	const ultragravity::WheelContacts Contacts = SweepWheels(Body);
 	const ultragravity::InputPacket Packet = MakePacket(InputQueue.Pop(SimulatedTicks), Body, DeltaTime);
@@ -271,6 +278,10 @@ void UGTOVehicleSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 	FScopeLock ScopeLock(&Lock);
 	Display.Advance(DeltaTime);
+	// For checking how evenly the sim steps reach the frames: Log LogGTOVehicleSim VeryVerbose
+	UE_LOG(LogGTOVehicleSim, VeryVerbose, TEXT("frame %.2f ms: %u sim steps, display %.2f steps behind the newest"),
+		DeltaTime * 1000.0, SimulatedTicks - TicksAtLastFrame, Display.GetShownDelay());
+	TicksAtLastFrame = SimulatedTicks;
 
 	const double Now = FPlatformTime::Seconds();
 	if (RateWindowStart == 0.0)

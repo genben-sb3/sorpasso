@@ -137,10 +137,16 @@ AGTOVehiclePawn::AGTOVehiclePawn()
 	CameraArm->bDoCollisionTest = false;
 	CameraArm->bInheritPitch = false;
 	CameraArm->bInheritRoll = false;
+	// A little lag smooths jolts without the camera trailing: the arm lags about speed / CameraLagSpeed behind (at 10 that
+	// was 5 m at 180 km/h), capped at CameraLagMaxDistance. Substepped, so uneven frame times do not shake it.
 	CameraArm->bEnableCameraLag = true;
-	CameraArm->CameraLagSpeed = 10.f;
+	CameraArm->CameraLagSpeed = 20.f;
+	CameraArm->CameraLagMaxDistance = 50.f; // cm
 	CameraArm->bEnableCameraRotationLag = true;
-	CameraArm->CameraRotationLagSpeed = 8.f;
+	CameraArm->CameraRotationLagSpeed = 12.f;
+	CameraArm->bUseCameraLagSubstepping = true;
+	// Ticks after the pawn, see BeginPlay.
+	CameraArm->PrimaryComponentTick.TickGroup = TG_PostPhysics;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(CameraArm, USpringArmComponent::SocketName);
@@ -152,6 +158,8 @@ void AGTOVehiclePawn::BeginPlay()
 {
 	Super::BeginPlay();
 	AddTickPrerequisiteComponent(Sim); // display after the sim has advanced its interpolation
+	// The arm places the camera from the display root's pose: after Tick has moved it, not from last frame's.
+	CameraArm->AddTickPrerequisiteActor(this);
 	StartTransform = GetActorTransform();
 	if (const TActorIterator<AGTOStartFinishLine> Line(GetWorld()); Line)
 	{

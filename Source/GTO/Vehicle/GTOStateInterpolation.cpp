@@ -38,30 +38,60 @@ FGTOSnapshotInterpolator::FGTOSnapshotInterpolator(double InStepDt)
 
 void FGTOSnapshotInterpolator::Reset(const FGTOVehicleState& State, double InStepDt)
 {
-	Previous = Latest = State;
+	for (FGTOVehicleState& Snapshot : Snapshots)
+	{
+		Snapshot = State;
+	}
 	StepDt = InStepDt;
-	Remainder = 0.0;
+	Newest = 0;
+	Shown = 0.0;
 }
 
 void FGTOSnapshotInterpolator::Push(const FGTOVehicleState& State)
 {
-	Previous = Latest;
-	Latest = State;
-	Remainder -= StepDt;
+	++Newest;
+	Snapshots[Slot(Newest)] = State;
 }
 
 void FGTOSnapshotInterpolator::Advance(double FrameDt)
 {
-	// Clamped, so a sim that falls behind the frame time holds the latest snapshot instead of extrapolating.
-	Remainder = FMath::Clamp(Remainder + FrameDt, 0.0, StepDt);
+	if (StepDt <= 0.0)
+	{
+		Shown = static_cast<double>(Newest);
+		return;
+	}
+	Shown += FrameDt / StepDt;
+	const double Error = (static_cast<double>(Newest) - Delay) - Shown; // sim steps, positive when the display lags too far
+	if (FMath::Abs(Error) > Capacity - 1)
+	{
+		Shown += Error; // after a reset or a hitch: jump instead of crawling through stale snapshots
+	}
+	else
+	{
+		Shown += Error * FMath::Min(1.0, FrameDt / CorrectionTime);
+	}
+	// Never ahead of the newest snapshot: a sim that falls behind holds it instead of extrapolating.
+	Shown = ShownTime();
+}
+
+double FGTOSnapshotInterpolator::ShownTime() const
+{
+	const double Oldest = static_cast<double>(FMath::Max<int64>(0, Newest - (Capacity - 1))); // sim steps
+	return FMath::Clamp(Shown, Oldest, static_cast<double>(Newest));
+}
+
+FGTOSnapshotInterpolator::FBlend FGTOSnapshotInterpolator::GetBlend() const
+{
+	const double Time = ShownTime(); // sim steps
+	FBlend Blend;
+	Blend.From = static_cast<int64>(FMath::FloorToDouble(Time));
+	Blend.To = FMath::Min(Blend.From + 1, Newest);
+	Blend.Alpha = Blend.To > Blend.From ? Time - static_cast<double>(Blend.From) : 0.0;
+	return Blend;
 }
 
 FGTOVehicleState FGTOSnapshotInterpolator::Sample() const
 {
-	return GTOInterpolateState(Previous, Latest, GetAlpha());
-}
-
-double FGTOSnapshotInterpolator::GetAlpha() const
-{
-	return StepDt > 0.0 ? Remainder / StepDt : 1.0;
+	const FBlend Blend = GetBlend();
+	return GTOInterpolateState(Snapshots[Slot(Blend.From)], Snapshots[Slot(Blend.To)], Blend.Alpha);
 }

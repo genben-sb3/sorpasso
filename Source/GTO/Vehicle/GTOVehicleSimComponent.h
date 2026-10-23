@@ -99,9 +99,8 @@ private:
 	ultragravity::SmoothingParams SmoothingParams;
 	ultragravity::SmoothingState Smoothing; // carried from step to step
 	FGTOVehicleState Stepped; // wheels, gear and engine as the last step left them; its chassis is unused
-	ultragravity::AnimationData SteppedAnimation;  // of the last step
-	ultragravity::AnimationData PreviousAnimation; // of the previous snapshot in Display
-	ultragravity::AnimationData LatestAnimation;   // of the latest snapshot in Display
+	ultragravity::AnimationData SteppedAnimation; // of the last step
+	TStaticArray<ultragravity::AnimationData, FGTOSnapshotInterpolator::Capacity> DisplayAnimation; // of Display's snapshots, by their slot
 	FGTOVehicleState Latest; // see GetLatestState
 	double LatestSimTime = 0.0;
 	double NextSimTime = 0.0;
@@ -109,6 +108,7 @@ private:
 	uint32 SimulatedTicks = 0;
 
 	// Game thread only.
+	uint32 TicksAtLastFrame = 0;
 	double TicksPerSecond = 0.0;
 	double RateWindowStart = 0.0;
 	uint32 RateWindowTicks = 0;
