@@ -5,6 +5,7 @@
 #include <numbers>
 
 #include "magic_formula.h"
+#include "ultragravity/units.h"
 
 namespace ultragravity {
 namespace {
@@ -107,7 +108,7 @@ double friction(const Tire& t, double wheel_load, double surface) {
 
 // Below the idle speed the idle controller opens from zero to full throttle
 // across this range.
-constexpr double idle_control_range = 100.0 * 2.0 * std::numbers::pi / 60.0; // rad/s
+constexpr double idle_control_range = 100.0 * rpm; // rad/s
 
 // Torque at full throttle, linear between the points, outside the curve
 // its end value.

@@ -17,6 +17,12 @@ Vor jedem Commit mit Physik-Dateien läuft `cmake --workflow --preset check` (Sa
 ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-commit"
 ```
 
+Ein Auto vermessen (Tabelle mit Zielwert, Ergebnis und Abweichung je Testmanöver; mit `--telemetry <Ordner>` zusätzlich je Testmanöver eine Telemetrie-CSV):
+
+```sh
+./build/tuning/tune ../Content/VehicleFiles/sports_coupe.json
+```
+
 Nur das Physikpaket bauen (ohne Testwelt und Tests):
 
 ```sh
@@ -27,6 +33,7 @@ cmake --build build --target ultragravity_physics
 
 - `physics/`: CMake-Ziel des Physikpakets (Quellen im Unreal-Modul `../Source/UltraGravity/`), nur Standardbibliothek, ohne Exceptions und RTTI
 - `test_world/`: Ersatz für Unreal: starrer Körper, Testgelände, Radkontakte
+- `tuning/`: Abstimm-Werkzeug: Testfahrer, Testmanöver und der Befehl `tune`, der ein Auto vermisst (gehört nicht zum Spiel)
 - `tests/`: doctest-Tests an den Nähten aus der Spec
 - Fahrzeugdateien: im Spiel unter `../Content/VehicleFiles/`, damit sie beim Packen mitkommen (ADR 0010)
 - `third_party/`: doctest 2.4.11 (Header plus `cmake/` für `doctest_discover_tests`); nlohmann/json 3.11.3 liegt im Modul unter `../Source/UltraGravity/ThirdParty/`

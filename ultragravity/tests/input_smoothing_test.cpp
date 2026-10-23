@@ -89,7 +89,7 @@ TEST_CASE("The steering limit drops with speed down to the peak slip angle") {
 
 TEST_CASE("At high speed a full key press does not steer beyond the grip") {
     const VehicleParams car = sports_coupe();
-    const double speed = 150.0 / 3.6; // m/s
+    const double speed = 150.0 * kmh; // m/s
     TestWorld world(car, 0.02, TestGround{}, speed);
     Drive drive(world);
     RawInput raw;

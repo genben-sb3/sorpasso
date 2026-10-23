@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "nlohmann/json.hpp"
+#include "ultragravity/units.h"
 
 namespace ultragravity {
 namespace {
@@ -39,6 +40,12 @@ public:
             return 0.0;
         }
         return field ? field->get<double>() : 0.0;
+    }
+
+    // A number that may be missing.
+    std::optional<double> optional_number(const json& parent, const std::string& path, const std::string& name) {
+        if (error || !parent.contains(name)) return std::nullopt;
+        return number(parent, path, name);
     }
 
     std::string text(const json& parent, const std::string& path, const std::string& name) {
@@ -154,9 +161,21 @@ Axle read_axle(Reader& reader, const json& axles, const std::string& name) {
     return a;
 }
 
+// The block "target_values" and each of its entries are optional.
+TargetValues read_target_values(Reader& reader, const json& root) {
+    TargetValues t;
+    if (!root.contains("target_values")) return t;
+    const std::string path = "target_values";
+    const json& o = reader.object(root, "", path);
+    t.acceleration_0_100 = reader.optional_number(o, path, "acceleration_0_100_s");
+    t.acceleration_0_200 = reader.optional_number(o, path, "acceleration_0_200_s");
+    t.braking_100_0 = reader.optional_number(o, path, "braking_distance_100_0_m");
+    if (const auto v = reader.optional_number(o, path, "top_speed_kmh")) t.top_speed = *v * kmh;
+    return t;
+}
+
 std::string element(const std::string& path, std::size_t index) { return path + "[" + std::to_string(index) + "]"; }
 
-constexpr double rpm = 2.0 * std::numbers::pi / 60.0; // rad/s per rpm
 constexpr double deg = std::numbers::pi / 180.0;      // rad per degree
 
 Drivetrain read_drivetrain(Reader& reader, const json& root) {
@@ -431,6 +450,13 @@ std::optional<LoadError> check(const VehicleParams& k) {
     p.between(k.center_of_mass.y, {-half_track, "right wheel"}, {half_track, "left wheel"}, "center_of_mass.y");
     p.positive(k.center_of_mass.z, "center_of_mass.z");
     p.positive(k.aero.drag_area, "aero.drag_area");
+    const auto target_positive = [&](const std::optional<double>& value, const char* name) {
+        if (value) p.positive(*value, child("target_values", name));
+    };
+    target_positive(k.target_values.acceleration_0_100, "acceleration_0_100_s");
+    target_positive(k.target_values.acceleration_0_200, "acceleration_0_200_s");
+    target_positive(k.target_values.braking_100_0, "braking_distance_100_0_m");
+    target_positive(k.target_values.top_speed, "top_speed_kmh");
     // Up to 60° the lock stays far away from turning the wheel sideways.
     p.positive(k.steering.max_steer_angle, "steering.max_steer_angle_deg");
     p.at_most(k.steering.max_steer_angle / deg, 60.0, "steering.max_steer_angle_deg");
@@ -528,6 +554,7 @@ LoadResult parse_vehicle_file(std::string_view text) {
     k.brakes.torque = reader.number(brakes, "brakes", "torque");
     k.brakes.balance = reader.number(brakes, "brakes", "balance");
     k.drivetrain = read_drivetrain(reader, root);
+    k.target_values = read_target_values(reader, root);
 
     if (reader.error) return {{}, reader.error};
     if (auto violation = foreign_blocks(root.at("drivetrain"))) return {{}, std::move(violation)};

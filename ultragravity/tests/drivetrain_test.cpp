@@ -71,9 +71,8 @@ TEST_CASE("The car pulls away from standstill, shifts up to sixth gear and does 
 
     // Lower limit: the rear axle transmits at most μ times its dynamic
     // load, a = μ·g·l_f / (L − μ·h). A real car with 300 hp and 1350 kg
-    // needs about 5 s. The upper band is deliberately wide because the test driver
-    // pulls away roughly; it gets tighter with the
-    // test maneuver in 09 and the target values in 18.
+    // needs about 5 s. The upper band lies just above the value of the test maneuver
+    // (tuning tool); the target value is tuned in package ticket 18.
     const double mu = car.rear.tire.peak_friction;
     const double wheelbase = car.front.x - car.rear.x;
     const double l_f = car.front.x - car.center_of_mass.x;
@@ -81,7 +80,7 @@ TEST_CASE("The car pulls away from standstill, shifts up to sixth gear and does 
     const double max_acceleration = mu * TestWorld::gravity * l_f / (wheelbase - mu * h);
     CAPTURE(zero_to_hundred);
     CHECK(zero_to_hundred > kmh_100 / max_acceleration); // measured: 5.85 s, band: > 3.63 s
-    CHECK(zero_to_hundred < 7.0); // measured: 5.85 s, band: < 7.0 s
+    CHECK(zero_to_hundred < 6.2); // measured: 5.85 s, band: ×1.06
 
     // In sixth gear the clutch sticks: engine and rear axle turn in the ratio of the gearing.
     drive.run(0.5, driver.packet(world));
@@ -299,7 +298,7 @@ TEST_CASE("In a drift the automatic holds the gear") {
     const VehicleParams car = with_automatic();
     TestGround slippery;
     slippery.friction = 0.4;
-    TestWorld world(car, 0.02, slippery, 80.0 / 3.6);
+    TestWorld world(car, 0.02, slippery, 80.0 * kmh);
     Drive drive(world);
     drive.run(1.0, drive_input(0.3)); // engage a gear and roll along
     const double drift_angle = car.drivetrain.gearbox.automatic.drift_angle;
@@ -328,7 +327,7 @@ namespace {
 // then full throttle. Returns the mean speed difference of the rear wheels
 // during the acceleration.
 double speed_difference_out_of_corner(const VehicleParams& car) {
-    TestWorld world(car, 0.02, TestGround{}, 40.0 / 3.6);
+    TestWorld world(car, 0.02, TestGround{}, 40.0 * kmh);
     Drive drive(world);
     InputPacket second;
     second.gear_request = 2;
@@ -488,7 +487,7 @@ TEST_CASE("Reverse only engages near standstill, never out of forward travel") {
     for (const bool automatic : {false, true}) {
         CAPTURE(automatic);
         const VehicleParams car = automatic ? with_automatic() : sports_coupe();
-        TestWorld world(car, 0.02, TestGround{}, 30.0 / 3.6);
+        TestWorld world(car, 0.02, TestGround{}, 30.0 * kmh);
         Drive drive(world);
         drive.run(0.5);
 

@@ -59,8 +59,8 @@ TEST_CASE("The top speed lies where drive force and driving resistance are in ba
     }
     const double expected = low;
     // measured: 281.2 km/h, band: > 250 km/h
-    REQUIRE(expected * 3.6 > 250.0); // a sports coupe with 300 hp
-    REQUIRE(expected * 3.6 < 300.0); // measured: 281.2 km/h, band: < 300 km/h
+    REQUIRE(expected / kmh > 250.0); // a sports coupe with 300 hp
+    REQUIRE(expected / kmh < 300.0); // measured: 281.2 km/h, band: < 300 km/h
 
     TestWorld world(car, 0.02);
     Drive drive(world);
@@ -78,8 +78,8 @@ TEST_CASE("The top speed lies where drive force and driving resistance are in ba
     drive.run(120.0, full_throttle);
 
     const double v = forward_speed(world);
-    CAPTURE(v * 3.6);
-    CAPTURE(expected * 3.6);
+    CAPTURE(v / kmh);
+    CAPTURE(expected / kmh);
     // The tires lose some slip to the drive force along the way; 2 % covers that.
     CHECK(v == doctest::Approx(expected).epsilon(0.02)); // measured: -0.54 %, band: ±2 %
     // Without more power it gets no faster: the acceleration is gone.
@@ -144,7 +144,7 @@ TEST_CASE("The downforce pushes down the axle it acts on") {
         k.rear.downforce = 0.0;
         return k;
     }();
-    constexpr double v = 200.0 / 3.6; // m/s
+    constexpr double v = 200.0 * kmh; // m/s
 
     const auto axle_loads = [&](const VehicleParams& k) {
         TestWorld world(k, 0.02, TestGround{}, v);

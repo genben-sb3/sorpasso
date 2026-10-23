@@ -8,13 +8,13 @@
 #include <optional>
 
 #include "doctest/doctest.h"
+#include "ultragravity/test_driver.h"
 #include "ultragravity/test_world.h"
+#include "ultragravity/units.h"
 
 namespace ultragravity::test {
 
-inline constexpr double kmh_100 = 100.0 / 3.6; // m/s
-
-inline constexpr double rpm = 2.0 * std::numbers::pi / 60.0; // rad/s per rpm
+inline constexpr double kmh_100 = 100.0 * kmh; // m/s
 
 inline double engine_speed(const TestWorld& world) { return world.last_step().animation.engine_speed; }
 
@@ -98,61 +98,6 @@ private:
     int direction_ = 0;
     int flips_in_a_row_ = 0;
     int longest_run_ = 0;
-};
-
-// Pulls away and shifts up just before the limiter: clutch in, throttle off,
-// next gear, after the shift time let the clutch out briskly. In the
-// lower gears it only gives as much throttle as keeps the rear wheels from spinning much.
-class TestDriver {
-public:
-    static constexpr double engage = 0.3;         // s clutch pressed before pulling away
-    static constexpr double clutch_launch = 0.5;  // s for letting the clutch out when pulling away
-    static constexpr double clutch_shift = 0.15;  // s for letting the clutch out after a shift
-    static constexpr double shift_speed = 6800.0 * rpm; // rad/s
-    static constexpr std::array<double, 3> throttle_low_gears{0.75, 0.95, 1.0}; // 1
-
-    explicit TestDriver(const VehicleParams& k)
-        : gears_(static_cast<int>(k.drivetrain.gearbox.ratios.size())),
-          shift_pause_(k.drivetrain.gearbox.shift_time + 0.05) {}
-
-    InputPacket packet(const TestWorld& world) {
-        InputPacket p;
-        p.gear_request = static_cast<std::int8_t>(gear_);
-        if (time_ < engage) {
-            p.clutch = 1.0;
-        } else if (time_ < engage + clutch_launch) {
-            p.throttle = throttle();
-            p.clutch = 1.0 - (time_ - engage) / clutch_launch;
-        } else {
-            const double since_shift = time_ - shifted_; // s
-            if (gear_ < gears_ && since_shift > shift_pause_ + clutch_shift &&
-                engine_speed(world) > shift_speed) {
-                ++gear_;
-                shifted_ = time_;
-                p.gear_request = static_cast<std::int8_t>(gear_);
-                p.clutch = 1.0;
-            } else if (since_shift < shift_pause_) {
-                p.clutch = 1.0;
-            } else {
-                p.throttle = throttle();
-                p.clutch = std::max(1.0 - (since_shift - shift_pause_) / clutch_shift, 0.0);
-            }
-        }
-        time_ += TestWorld::time_step;
-        return p;
-    }
-
-    int gear() const { return gear_; }
-    bool clutch_engaged() const { return time_ - shifted_ > shift_pause_ + clutch_shift; }
-
-private:
-    double throttle() const { return gear_ <= 3 ? throttle_low_gears[gear_ - 1] : 1.0; }
-
-    int gears_;
-    double shift_pause_; // s
-    int gear_ = 1;
-    double time_ = 0.0;     // s since the start of pulling away
-    double shifted_ = -1e9; // s, time of the last gear change
 };
 
 } // namespace ultragravity::test

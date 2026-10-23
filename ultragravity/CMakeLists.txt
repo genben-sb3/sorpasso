@@ -12,5 +12,8 @@ add_subdirectory(physics)
 # Stand-in for Unreal in the terminal, only for the tests.
 add_subdirectory(test_world)
 
+# Tuning tool: test driver, test maneuvers and the command that measures a car (ADR 0003: no Unreal).
+add_subdirectory(tuning)
+
 enable_testing()
 add_subdirectory(tests)

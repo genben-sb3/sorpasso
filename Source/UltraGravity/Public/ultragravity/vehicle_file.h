@@ -133,6 +133,15 @@ struct Aero {
     double drag_area = 0.0; // m², drag coefficient times frontal area (cD·A)
 };
 
+// Desired results of the test maneuvers of the tuning tool. What the vehicle file does
+// not name stays empty: there is no target for it.
+struct TargetValues {
+    std::optional<double> acceleration_0_100; // s
+    std::optional<double> acceleration_0_200; // s
+    std::optional<double> braking_100_0;      // m, without ABS
+    std::optional<double> top_speed;          // m/s
+};
+
 // All parameters of a car. All positions are in the same vehicle frame
 // (ISO 8855); its origin is free, usually the center of the front axle at
 // ground level in design position.
@@ -147,6 +156,7 @@ struct VehicleParams {
     Steering steering;
     Brakes brakes;
     Drivetrain drivetrain;
+    TargetValues target_values; // optional, only read by the tuning tool
 };
 
 struct LoadError {

@@ -12,6 +12,7 @@
 #include "drive.h"
 #include "nlohmann/json.hpp"
 #include "ultragravity/test_world.h"
+#include "ultragravity/units.h"
 #include "ultragravity/vehicle_file.h"
 
 using namespace ultragravity;
@@ -48,7 +49,6 @@ TEST_CASE("The sports coupe has 300 hp and six gears") {
     const Drivetrain& drivetrain = result.params.drivetrain;
     CHECK(drivetrain.gearbox.ratios.size() == 6);
     // The vehicle file states engine speeds in rpm, the vehicle params in rad/s.
-    constexpr double rpm = 2.0 * std::numbers::pi / 60.0;
     CHECK(drivetrain.engine.idle_speed == doctest::Approx(900.0 * rpm));
     double peak_power = 0.0;
     for (const TorquePoint& p : drivetrain.engine.torque_curve) {
@@ -549,4 +549,43 @@ TEST_CASE("A vehicle file text cut off in the middle yields a syntax error inste
     REQUIRE(result.error.has_value());
     CHECK(result.error->field == "");
     CHECK(result.error->message.starts_with("invalid JSON at line "));
+}
+
+TEST_CASE("Target values are optional: given ones load, missing ones stay empty") {
+    nlohmann::json j = sports_coupe();
+    j["target_values"] = {{"acceleration_0_100_s", 5.5}, {"top_speed_kmh", 270.0}};
+
+    const LoadResult result = parse(j);
+
+    REQUIRE_FALSE(result.error.has_value());
+    const TargetValues& t = result.params.target_values;
+    CHECK(t.acceleration_0_100.value() == doctest::Approx(5.5));
+    CHECK(t.top_speed.value() == doctest::Approx(75.0)); // m/s
+    CHECK_FALSE(t.acceleration_0_200.has_value());
+    CHECK_FALSE(t.braking_100_0.has_value());
+}
+
+TEST_CASE("A vehicle file without a target values block loads without targets") {
+    nlohmann::json j = sports_coupe();
+    j.erase("target_values");
+
+    const LoadResult result = parse(j);
+
+    REQUIRE_FALSE(result.error.has_value());
+    CHECK_FALSE(result.params.target_values.acceleration_0_100.has_value());
+}
+
+TEST_CASE("Unusable target values are reported with their path") {
+    nlohmann::json j = sports_coupe();
+    j["target_values"] = {{"braking_distance_100_0_m", -3.0}};
+    LoadResult result = parse(j);
+    REQUIRE(result.error.has_value());
+    CHECK(result.error->field == "target_values.braking_distance_100_0_m");
+    CHECK(result.error->message == "must be greater than 0");
+
+    j["target_values"] = {{"acceleration_0_100_s", "fast"}};
+    result = parse(j);
+    REQUIRE(result.error.has_value());
+    CHECK(result.error->field == "target_values.acceleration_0_100_s");
+    CHECK(result.error->message == "is not a number");
 }
