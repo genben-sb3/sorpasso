@@ -104,7 +104,7 @@
       "idle_rpm": 900.0,
       "rev_limit_rpm": 7200.0,
       "inertia": 0.2,
-      "drag_torque": 60.0
+      "drag_torque": 150.0
     },
     "clutch": {
       "torque": 550.0

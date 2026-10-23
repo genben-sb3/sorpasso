@@ -107,7 +107,7 @@ TEST_CASE("At constant speed and fixed steering a steady-state circle develops")
     // Steady state: radius and speed barely change from second to second.
     CHECK(second.radius == doctest::Approx(first.radius).epsilon(0.01)); // measured: equal to 6 digits, band: ±1 %
     CHECK(second.speed == doctest::Approx(first.speed).epsilon(0.01)); // measured: equal to 6 digits, band: ±1 %
-    CHECK(second.lateral_acceleration > 3.0); // measured: 3.91 m/s², band: > 3.0 m/s²
+    CHECK(second.lateral_acceleration > 3.0); // measured: 3.88 m/s², band: > 3.0 m/s²
     // The tire forces keep the car exactly on the driven circle. On a
     // steady-state circle that follows from kinematics; the comparison checks that
     // path and forces fit together, the statement about the tire model lies in
@@ -173,8 +173,8 @@ TEST_CASE("On its sports tires the coupe corners at more than 1 g with the steer
     const double mean = sum / ticks; // m/s²
     CAPTURE(mean);
     // With μ = 1.05 (everyday tire) it was 0.90 g.
-    CHECK(mean > 1.0 * TestWorld::gravity);  // measured: 1.07 g, band: > 1.0 g
-    CHECK(mean < 1.15 * TestWorld::gravity); // measured: 1.07 g, band: < 1.15 g
+    CHECK(mean > 1.0 * TestWorld::gravity);  // measured: 1.06 g, band: > 1.0 g
+    CHECK(mean < 1.15 * TestWorld::gravity); // measured: 1.06 g, band: < 1.15 g
 }
 
 namespace {
@@ -206,7 +206,7 @@ TEST_CASE("In a corner the body rolls outward and the outer wheels carry more lo
     const Roll r = left_corner(car);
     CAPTURE(r.lateral_acceleration);
     CAPTURE(r.roll_angle);
-    REQUIRE(r.lateral_acceleration > 5.0); // measured: 5.39 m/s², band: > 5.0 m/s²
+    REQUIRE(r.lateral_acceleration > 5.0); // measured: 5.36 m/s², band: > 5.0 m/s²
 
     CHECK(r.roll_angle > 0.0);
     CHECK(r.transfer_front > 0.0);
@@ -251,7 +251,7 @@ TEST_CASE("Braking in a corner costs cornering force, the tires stay within the 
     Drive drive(world);
     for (int i = 0; i < Drive::ticks(6.0); ++i) drive.one_tick(circle(world, steering, 15.0, 2));
     const double before = lateral_acceleration(world, car.mass); // m/s²
-    REQUIRE(before > 5.0); // measured: 5.39 m/s², band: > 5.0 m/s²
+    REQUIRE(before > 5.0); // measured: 5.36 m/s², band: > 5.0 m/s²
 
     // Full braking with the same steering. The wheels lock and push almost
     // only longitudinally.

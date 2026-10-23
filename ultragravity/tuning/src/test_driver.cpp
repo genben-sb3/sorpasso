@@ -76,4 +76,51 @@ double SteeringController::path(const BodyMotion& b, const std::function<double(
     return std::clamp(std::atan(wheelbase_ * curvature) / max_steer_angle_, -1.0, 1.0);
 }
 
+namespace {
+
+constexpr double drift_countersteer_p = 0.5;    // 1, steer angle per rad of drift angle deviation
+constexpr double drift_yaw_rate_d = 1.0;        // 1, share of the yaw term in the front wheel direction
+constexpr double drift_rate_d = 0.3;            // s, steer angle per rad/s of drift angle rate
+constexpr double drift_smoothing = 0.3;         // 1, low-pass of the heading rate per tick
+constexpr double drift_base_throttle = 0.65;    // 1; the package had 0.55, too little to hold 25 degrees with peak friction 1.25
+constexpr double drift_throttle_p = 0.6;        // 1 throttle per rad of deviation
+constexpr double drift_throttle_i = 1.0;        // 1/s per rad of deviation
+constexpr double drift_integral_limit = 0.5;    // 1, bound of the integral part
+constexpr double drift_throttle_min = 0.25;     // 1
+constexpr double drift_speed_min = 5.0;         // m/s, guards the division in the yaw term
+
+} // namespace
+
+DriftController::DriftController(const VehicleParams& k)
+    : max_steer_angle_(k.steering.max_steer_angle), front_axle_distance_(k.front.x - k.center_of_mass.x) {}
+
+double DriftController::drift_angle(const BodyMotion& b) {
+    // Sign: positive when the motion lies right of the longitudinal axis (rear out to the left).
+    return -drift_angle_full(rotate_inverse(b.orientation, b.velocity));
+}
+
+DriftController::Output DriftController::regulate(const BodyMotion& b, double target) {
+    const double angle = drift_angle(b);        // rad
+    const double deviation = angle - target;    // rad
+    throttle_integral_ = std::clamp(throttle_integral_ - drift_throttle_i * deviation * TestWorld::time_step,
+                                    -drift_integral_limit, drift_integral_limit);
+    // Counter-steer against the drift angle; more deviation means more counter-steering.
+    // Rate of the drift angle: yaw rate minus rotation rate of the direction of travel (smoothed).
+    const double heading = std::atan2(b.velocity.y, b.velocity.x); // rad
+    if (heading_known_) {
+        const double rate = wrap_angle(heading - heading_) / TestWorld::time_step; // rad/s
+        heading_rate_ += (rate - heading_rate_) * drift_smoothing;
+    }
+    heading_ = heading;
+    heading_known_ = true;
+    const double angle_rate = b.angular_velocity.z - heading_rate_;                                   // rad/s
+    const double speed = std::max(std::hypot(b.velocity.x, b.velocity.y), drift_speed_min);         // m/s
+    const double steer_angle = -angle + drift_yaw_rate_d * b.angular_velocity.z * front_axle_distance_ / speed -
+                               drift_countersteer_p * deviation - drift_rate_d * angle_rate; // rad
+    Output out;
+    out.steering = std::clamp(steer_angle / max_steer_angle_, -1.0, 1.0);
+    out.throttle = std::clamp(drift_base_throttle - drift_throttle_p * deviation + throttle_integral_, drift_throttle_min, 1.0);
+    return out;
+}
+
 } // namespace ultragravity

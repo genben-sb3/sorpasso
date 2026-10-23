@@ -30,7 +30,7 @@ TEST_CASE("In neutral and with the clutch pressed the engine holds its idle spee
         Drive drive(world);
         for (int tick = 0; tick < Drive::ticks(3.0); ++tick) {
             drive.one_tick({});
-            // measured: 93.94 to 94.04 rad/s (-0.3 %), band: ±2 %
+            // measured: 93.5 to 93.8 rad/s (-0.8 % with drag torque 150 N·m), band: ±2 %
             CHECK(engine_speed(world) == doctest::Approx(idle).epsilon(0.02));
         }
     }
@@ -43,7 +43,7 @@ TEST_CASE("In neutral and with the clutch pressed the engine holds its idle spee
         pressed.clutch = 1.0;
         for (int tick = 0; tick < Drive::ticks(3.0); ++tick) {
             drive.one_tick(pressed);
-            // measured: 93.94 to 94.04 rad/s (-0.3 %), band: ±2 %
+            // measured: 93.5 to 93.8 rad/s (-0.8 % with drag torque 150 N·m), band: ±2 %
             CHECK(engine_speed(world) == doctest::Approx(idle).epsilon(0.02));
         }
         // Without drive the engine does not slow the car; only the driving resistances
@@ -79,13 +79,14 @@ TEST_CASE("The car pulls away from standstill, shifts up to sixth gear and does 
     const double h = car.center_of_mass.z;
     const double max_acceleration = mu * TestWorld::gravity * l_f / (wheelbase - mu * h);
     CAPTURE(zero_to_hundred);
-    CHECK(zero_to_hundred > kmh_100 / max_acceleration); // measured: 5.85 s, band: > 3.63 s
-    CHECK(zero_to_hundred < 6.2); // measured: 5.85 s, band: ×1.06
+    CHECK(zero_to_hundred > kmh_100 / max_acceleration); // measured: 6.11 s, band: > 3.63 s
+    // measured: 6.11 s (5.85 s with drag torque 60 N·m before package ticket 19), band: ×1.06
+    CHECK(zero_to_hundred < 6.5);
 
     // In sixth gear the clutch sticks: engine and rear axle turn in the ratio of the gearing.
     drive.run(0.5, driver.packet(world));
     const double overall = car.drivetrain.gearbox.ratios[5] * car.drivetrain.gearbox.final_drive;
-    // measured: 584.98 rad/s (deviation below 1e-5), band: ±1 %
+    // measured: 584.11 rad/s (deviation below 1e-5), band: ±1 %
     CHECK(engine_speed(world) == doctest::Approx(rear_axle_speed(world) * overall).epsilon(0.01));
 }
 
@@ -135,9 +136,9 @@ TEST_CASE("Lifting off in gear slows the car through engine braking") {
         CHECK(forward_speed(in_gear) < v_before);
     }
 
-    // About 670 N of drag force at 4600 rpm decelerates by roughly 0.45 m/s² more than
+    // About 1670 N of drag force at 4600 rpm decelerates by roughly 1.2 m/s² more than
     // the driving resistances in neutral.
-    CHECK(forward_speed(in_neutral) - forward_speed(in_gear) > 0.5); // measured: 1.82 m/s, band: > 0.5 m/s
+    CHECK(forward_speed(in_neutral) - forward_speed(in_gear) > 0.5); // measured: 3.16 m/s, band: > 0.5 m/s
 }
 
 TEST_CASE("With too much throttle when pulling away the rear wheels spin") {
@@ -199,9 +200,9 @@ TEST_CASE("The open differential lets the rear wheel on a slippery surface spin,
     const auto& omega = world.last_step().state.wheel_speed;
     const double r = car.rear.wheel_radius;
     CAPTURE(v);
-    REQUIRE(v > 0.1); // measured: 0.80 m/s, band: > 0.1 m/s
+    REQUIRE(v > 0.1); // measured: 0.78 m/s, band: > 0.1 m/s
     // The speeds drift apart freely: the right one spins, the left rolls almost without slip.
-    CHECK(omega[rear_right] * r > v + 5.0); // measured: v + 34.4 m/s, band: > v + 5.0 m/s
+    CHECK(omega[rear_right] * r > v + 5.0); // measured: v + 29.9 m/s, band: > v + 5.0 m/s
     CHECK(omega[rear_left] * r < v + 0.5); // measured: v + 0.05 m/s, band: < v + 0.5 m/s
     // Both sides get the same torque, so no more than the slippery wheel
     // supports: the car gets away much worse than on a dry surface.
@@ -243,11 +244,11 @@ TEST_CASE("The automatic pulls away, shifts up at full throttle and does not hun
     }
 
     CAPTURE(sequence.gears.size());
-    CHECK(forward_speed(world) > 40.0); // measured: 60.3 m/s, band: > 40 m/s
+    CHECK(forward_speed(world) > 40.0); // measured: 60.1 m/s, band: > 40 m/s
     REQUIRE(sequence.gears.size() >= 5); // measured: 5 gears, band: >= 5
     // Only upward, one gear after the other, and every gear is held.
     for (std::size_t i = 1; i < sequence.gears.size(); ++i) CHECK(sequence.gears[i] == sequence.gears[i - 1] + 1);
-    // measured: at least 2.0 s, band: >= 0.8 s (hold_time)
+    // measured: at least 1.95 s, band: >= 0.8 s (hold_time)
     for (double time : sequence.hold_times) CHECK(time >= car.drivetrain.gearbox.automatic.hold_time);
 }
 
@@ -268,7 +269,7 @@ TEST_CASE("The automatic shifts down when braking and does not shift back up mea
         sequence.add(gear(world), tick * TestWorld::time_step);
     }
 
-    CHECK(forward_speed(world) < 1.0); // measured: 0.95 m/s, band: < 1.0 m/s
+    CHECK(forward_speed(world) < 1.0); // measured: 0.96 m/s, band: < 1.0 m/s
     CHECK(gear(world) < top);
     for (std::size_t i = 1; i < sequence.gears.size(); ++i) CHECK(sequence.gears[i] == sequence.gears[i - 1] - 1);
 }
@@ -361,8 +362,8 @@ TEST_CASE("With a limited-slip differential the rear wheel speed difference out 
 
     CAPTURE(difference_open);
     CAPTURE(difference_locked);
-    REQUIRE(difference_open > 0.5); // measured: 85.2 rad/s, band: > 0.5 rad/s
-    CHECK(difference_locked < 0.7 * difference_open); // measured: 4.7e-16 rad/s (about 0·open), band: < 0.7·open
+    REQUIRE(difference_open > 0.5); // measured: 84.3 rad/s, band: > 0.5 rad/s
+    CHECK(difference_locked < 0.7 * difference_open); // measured: 0.0054 rad/s (about 0·open), band: < 0.7·open
 }
 
 TEST_CASE("The limited-slip differential gives more traction than the open one on a surface slippery on one side") {
@@ -391,7 +392,7 @@ TEST_CASE("The limited-slip differential gives more traction than the open one o
         return forward_speed(world);
     };
 
-    // measured: 1.71·open, band: > 1.5·open
+    // measured: 1.80·open, band: > 1.5·open
     CHECK(speed_after_pulling_away(locked) > 1.5 * speed_after_pulling_away(open));
 }
 
@@ -424,7 +425,7 @@ TEST_CASE("Front- and all-wheel drive pull away, accelerate and brake stably") {
         }
         const double v = forward_speed(world);
         CAPTURE(v);
-        CHECK(v > 15.0); // measured: 42.6 m/s (front), 45.3 m/s (all-wheel), band: > 15 m/s
+        CHECK(v > 15.0); // measured: 43.2 m/s (front), 44.4 m/s (all-wheel), band: > 15 m/s
         CHECK(engine.longest_run() < 3); // measured: 1, band: < 3
         CHECK(highest_yaw_rate < 0.05); // measured: 0 rad/s, band: < 0.05 rad/s
         CHECK(std::abs(world.body().position.y) < 0.3); // measured: 0 m, band: < 0.3 m
@@ -438,7 +439,7 @@ TEST_CASE("Front- and all-wheel drive pull away, accelerate and brake stably") {
             drive.one_tick(braking);
             highest_yaw_rate = std::max(highest_yaw_rate, std::abs(world.body().angular_velocity.z));
         }
-        CHECK(forward_speed(world) < 0.5); // measured: 0.46 to 0.50 m/s, band: < 0.5 m/s
+        CHECK(forward_speed(world) < 0.5); // measured: 0.48 m/s, band: < 0.5 m/s
         CHECK(highest_yaw_rate < 0.05); // measured: 0 rad/s, band: < 0.05 rad/s
         CHECK(std::abs(world.body().position.y) < 0.5); // measured: 0 m, band: < 0.5 m
     }
@@ -473,7 +474,7 @@ TEST_CASE("In reverse with throttle the car pulls away backward and its wheels t
 
     const double v = forward_speed(world);
     CAPTURE(v);
-    CHECK(v < -2.0); // measured: -5.19 m/s, band: < -2.0 m/s
+    CHECK(v < -2.0); // measured: -4.69 m/s, band: < -2.0 m/s
     CHECK(gear(world) == -1);
     for (int i = 0; i < wheel_count; ++i) CHECK(world.last_step().state.wheel_speed[i] < 0.0);
     // measured: 300 ticks (2.5 s), band: > 180 ticks (1.5 s)

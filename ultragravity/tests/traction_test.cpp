@@ -98,6 +98,6 @@ TEST_CASE("Traction control does not oscillate") {
         // on and off every tick would be over 100.
         CHECK(f.direction_changes <= 6); // measured: at most 3, band: <= 6
         // It does not brake into nothing: the car makes progress with it.
-        CHECK(f.speed > 6.0); // measured: at least 8.42 m/s, band: > 6.0 m/s
+        CHECK(f.speed > 6.0); // measured: at least 8.30 m/s, band: > 6.0 m/s
     }
 }

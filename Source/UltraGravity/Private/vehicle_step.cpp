@@ -341,6 +341,9 @@ double traction_factor(double factor, int level, const DrivenAxles& driven,
     return factor;
 }
 
+// The handbrake only acts on the rear wheels and locks them when fully pulled.
+constexpr double handbrake_torque = 2500.0; // N·m per rear wheel with the handbrake fully pulled
+
 // ABS: it sits between input packet and brakes and limits the brake impulse of a wheel so
 // that the wheel speed after the substep does not drop below the one belonging to the peak
 // slip (predictive, based on the speed after tire and drive). Below the minimum speed it
@@ -475,7 +478,8 @@ StepResult vehicle_step(const State& state, const VehicleParams& params,
         wheel.axle = mounts[i].axle;
         const double axle_share = front_wheel(i) ? params.brakes.balance : 1.0 - params.brakes.balance; // 1
         const double full_brake_torque = params.brakes.torque * axle_share / 2.0; // N·m with the brake fully applied
-        const double driver_brake_torque = input.brake * full_brake_torque;     // N·m
+        const double handbrake = front_wheel(i) ? 0.0 : std::clamp(input.handbrake, 0.0, 1.0) * handbrake_torque; // N·m
+        const double driver_brake_torque = input.brake * full_brake_torque + handbrake; // N·m
         // The stability control adds to the driver's brake, at most up to the full brake.
         wheel.brake_torque = std::min(driver_brake_torque + stability.brake_torque[i],
                                       std::max(driver_brake_torque, full_brake_torque));

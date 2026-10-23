@@ -66,4 +66,33 @@ private:
     double integral_ = 0.0;  // m·s, circle error over time
 };
 
+// The drift controller of the test driver: holds a drift angle through counter-steering and
+// throttle. It only reads the body motion (heading and direction of travel, as a driver sees
+// them) and returns steering and throttle for the input packet; gear and clutch stay with the
+// caller. It does not call the input smoothing.
+class DriftController {
+public:
+    struct Output {
+        double steering = 0.0; // -1 right … 1 left
+        double throttle = 0.0; // 0 … 1
+    };
+
+    explicit DriftController(const VehicleParams& k);
+
+    // Controls toward the drift angle `target` (rad, positive: front left of the direction of
+    // travel, i.e. the rear out in a left-hand corner). Counter-steering acts fast, the throttle slowly.
+    Output regulate(const BodyMotion& body, double target); // target in rad
+
+    // Drift angle of the body in rad, positive as for `regulate`.
+    static double drift_angle(const BodyMotion& body);
+
+private:
+    double max_steer_angle_;      // rad
+    double front_axle_distance_;  // m, center of mass to front axle
+    double heading_ = 0.0;        // rad, direction of travel in the last tick
+    double heading_rate_ = 0.0;   // rad/s, smoothed rotation rate of the direction of travel
+    bool heading_known_ = false;
+    double throttle_integral_ = 0.0; // 1, throttle share from the control deviation
+};
+
 } // namespace ultragravity

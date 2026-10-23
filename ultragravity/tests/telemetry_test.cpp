@@ -106,8 +106,8 @@ TEST_CASE("The values of a row match the state of the tick") {
     }
     CHECK(forces_seen);
     // The maneuver really drives: the car moves and has load on the wheels.
-    CHECK(run.steps.back().telemetry.speed > 5.0); // measured: 13.6 m/s, band: > 5.0 m/s
-    CHECK(run.steps.back().telemetry.wheel_load[rear_right] > 1000.0); // measured: 2339 N, band: > 1000 N
+    CHECK(run.steps.back().telemetry.speed > 5.0); // measured: 12.1 m/s, band: > 5.0 m/s
+    CHECK(run.steps.back().telemetry.wheel_load[rear_right] > 1000.0); // measured: 1586 N, band: > 1000 N
 }
 
 TEST_CASE("The telemetry does not change the drive") {

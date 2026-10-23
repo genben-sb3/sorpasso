@@ -70,6 +70,10 @@ inline double drift_angle_magnitude(Vec3 v) { return std::atan2(std::abs(v.y), s
 // bounded below by longitudinal_min (m/s), so the angle stays finite at standstill and in reverse.
 inline double drift_angle(Vec3 v, double longitudinal_min) { return std::atan2(v.y, std::max(v.x, longitudinal_min)); }
 
+// Signed drift angle in rad (positive to the left, -π to π) without clamping: unique also when
+// sliding sideways or backward. v in the vehicle frame; not for standstill.
+inline double drift_angle_full(Vec3 v) { return std::atan2(v.y, v.x); }
+
 // Angular acceleration of a rigid body by Euler's equations about its principal axes. Orientation,
 // angular velocity and torque as in BodyMotion (world frame), the principal moments of inertia in the
 // vehicle frame; the result in the world frame.

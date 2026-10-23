@@ -64,7 +64,7 @@ TEST_CASE("The time 0–100 km/h matches a measurement on the trace of the drive
 
     REQUIRE_FALSE(m.failed());
     CHECK(m.unit == "s");
-    // measured: 5.852 s, deviation below 0.01 %, band: ±0.5 % (tick resolution of the interpolation)
+    // measured: 6.113 s, deviation below 0.01 %, band: ±0.5 % (tick resolution of the interpolation)
     CHECK(*m.result == doctest::Approx(time_to(read_trace(csv.str()), kmh_100)).epsilon(0.005));
 }
 
@@ -75,7 +75,7 @@ TEST_CASE("The time 0–200 km/h matches a measurement on the trace of the drive
 
     REQUIRE_FALSE(m.failed());
     const Trace trace = read_trace(csv.str());
-    // measured: 17.42 s, deviation below 0.01 %, band: ±0.5 % (tick resolution of the interpolation)
+    // measured: 17.84 s, deviation below 0.01 %, band: ±0.5 % (tick resolution of the interpolation)
     CHECK(*m.result == doctest::Approx(time_to(trace, 200.0 * kmh)).epsilon(0.005));
     CHECK(*m.result > time_to(trace, kmh_100));
 }
