@@ -230,8 +230,8 @@ TEST_CASE("A power-over takes the car from cornering into a drift" * doctest::sh
     DriftDrive d;
     REQUIRE(d.initiate(Initiation::power_over));
     d.hold(drift_target, 3.0);
-    CHECK(drift_angle(d.world) > 20.0 * deg);
-    CHECK(speed(d.world) > 20.0); // m/s
+    CHECK(drift_angle(d.world) > 20.0 * deg); // measured: not reached, the initiation fails (see above)
+    CHECK(speed(d.world) > 20.0); // m/s; measured: not reached, the initiation fails (see above)
 }
 
 TEST_CASE("Lift-off, handbrake and clutch kick each take the car from cornering into a drift") {

@@ -46,7 +46,7 @@ ln -s ../../.githooks/pre-commit "$(git rev-parse --git-common-dir)/hooks/pre-co
 
 `core.hooksPath` bleibt unverändert, damit die Git-LFS-Hooks in `.git/hooks` weiterlaufen.
 
-Für Modul und CMake-Projekt gelten die Coding Standards in `CODING_STANDARDS.md`. Code, Dateinamen und Feldnamen der Fahrzeugdatei sind Englisch; Doku, Issues und Commit-Nachrichten Deutsch (ADR 0011).
+Für Modul und CMake-Projekt gelten die Coding Standards in `CODING_STANDARDS.md`. Vor jeder neuen Formel `docs/agents/helpers.md` lesen und mit `rg` suchen. Code, Dateinamen und Feldnamen der Fahrzeugdatei sind Englisch; Doku, Issues und Commit-Nachrichten Deutsch (ADR 0011).
 
 ## Binäre Assets
 

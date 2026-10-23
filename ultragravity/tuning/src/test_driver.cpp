@@ -55,8 +55,8 @@ double SteeringController::circle_error(const BodyMotion& b, double radius) {
 double SteeringController::circle(const BodyMotion& b, double radius) {
     const double error = circle_error(b, radius); // m
     // Tangent of the left-hand circle at the position: perpendicular to the radius, counterclockwise.
-    const double target_heading = std::atan2(b.position.x, -(b.position.y - radius)); // rad
-    const double heading = std::atan2(b.velocity.y, b.velocity.x);                    // rad
+    const double target_heading = std::atan2(b.position.x, -(b.position.y - radius)); // rad; helper-ok: tangent of the circle
+    const double heading = std::atan2(b.velocity.y, b.velocity.x);                    // rad; helper-ok: course in the world frame
     const double heading_error = wrap_angle(target_heading - heading);                // rad
     integral_ = std::clamp(integral_ + error * TestWorld::time_step, -circle_integral_limit, circle_integral_limit);
     const double angle = std::atan(wheelbase_ / radius) + circle_steer_per_meter * error +
@@ -67,7 +67,7 @@ double SteeringController::circle(const BodyMotion& b, double radius) {
 double SteeringController::path(const BodyMotion& b, const std::function<double(double)>& target_y,
                                 double lookahead) {
     const Vec3 forward = rotate(b.orientation, {1.0, 0.0, 0.0});
-    const double heading = std::atan2(forward.y, forward.x); // rad
+    const double heading = std::atan2(forward.y, forward.x); // rad; helper-ok: heading in the world frame
     const double aim_x = b.position.x + lookahead;            // m
     const double dx = aim_x - b.position.x;                   // m
     const double dy = target_y(aim_x) - b.position.y;         // m
@@ -106,7 +106,7 @@ DriftController::Output DriftController::regulate(const BodyMotion& b, double ta
                                     -drift_integral_limit, drift_integral_limit);
     // Counter-steer against the drift angle; more deviation means more counter-steering.
     // Rate of the drift angle: yaw rate minus rotation rate of the direction of travel (smoothed).
-    const double heading = std::atan2(b.velocity.y, b.velocity.x); // rad
+    const double heading = std::atan2(b.velocity.y, b.velocity.x); // rad; helper-ok: course in the world frame
     if (heading_known_) {
         const double rate = wrap_angle(heading - heading_) / TestWorld::time_step; // rad/s
         heading_rate_ += (rate - heading_rate_) * drift_smoothing;

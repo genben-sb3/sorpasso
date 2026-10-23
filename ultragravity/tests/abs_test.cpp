@@ -50,7 +50,7 @@ Braking brake(bool with_abs, double steering) {
         }
         if (tick == 90) {
             const Vec3 v = world.body().velocity;
-            b.heading_change = std::abs(std::atan2(v.y, v.x));
+            b.heading_change = std::abs(std::atan2(v.y, v.x)); // helper-ok: course in the world frame, not a drift angle
         }
     }
     b.distance = length(world.body().position - start);

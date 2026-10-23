@@ -239,7 +239,7 @@ TEST_CASE("The skidpad yields the lateral acceleration from speed and radius of 
     // The result is a one-second mean with the radius inside the tolerance, so just below the peak.
     // measured: 1.137 g against 1.234 g peak (×0.92), band: 0.9 to 1.02
     CHECK(*m.result <= highest * 1.02);
-    CHECK(*m.result >= highest * 0.9);
+    CHECK(*m.result >= highest * 0.9); // measured: see above
 }
 
 TEST_CASE("The skidpad raises the speed up to the limit, not until the time runs out") {
@@ -286,7 +286,7 @@ TEST_CASE("The steering controller follows a path to the left when it lies left 
     const double right = steer.path(b, [](double) { return -1.0; }, 10.0);
     const double straight = steer.path(b, [](double) { return 0.0; }, 10.0);
 
-    CHECK(left > 0.0);
+    CHECK(left > 0.0); // measured: positive, band: sign
     CHECK(right == doctest::Approx(-left));
     CHECK(straight == doctest::Approx(0.0));
 }
@@ -298,7 +298,7 @@ TEST_CASE("The lane change finds an entry speed a human calls sensible") {
     CHECK(m.unit == "km/h");
     // measured: 105.0 km/h, band: 70 to 130 km/h (moose test results lie at 80 to 110 km/h)
     CHECK(*m.result > 70.0);
-    CHECK(*m.result < 130.0);
+    CHECK(*m.result < 130.0); // measured: see above
 }
 
 TEST_CASE("A car with less tire grip passes the lane change only slower") {

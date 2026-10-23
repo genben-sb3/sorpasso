@@ -166,7 +166,7 @@ TEST_CASE("In the ghost the wheel keeps turning in the right direction between s
     const double after = ghost.pose_at(1.0).animation.wheel_angle[front_left]; // rad
     const double step = wrap_angle(after - real);                              // rad
     const double expected = r.snapshots[0].state.wheel_speed[front_left] * TestWorld::time_step; // rad
-    CHECK(step > 0.0);
+    CHECK(step > 0.0); // measured: positive (the wheel rolls forward), band: sign
     CHECK(step == doctest::Approx(expected));
 }
 
