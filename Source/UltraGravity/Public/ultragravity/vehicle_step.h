@@ -61,6 +61,8 @@ struct State {
     double shift_remaining = 0.0;                  // s until the gear engages
     double gear_age = 1000.0;                      // s since the last gear change
     double traction_factor = 1.0;                  // 1, share of the throttle that traction control lets through
+
+    bool operator==(const State&) const = default;
 };
 
 

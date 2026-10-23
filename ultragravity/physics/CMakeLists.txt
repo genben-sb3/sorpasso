@@ -6,6 +6,7 @@ add_library(ultragravity_physics
   ${UG_MODULE}/Private/animation_data.cpp
   ${UG_MODULE}/Private/checksum.cpp
   ${UG_MODULE}/Private/input_smoothing.cpp
+  ${UG_MODULE}/Private/recording.cpp
   ${UG_MODULE}/Private/telemetry_csv.cpp
   ${UG_MODULE}/Private/vehicle_file.cpp
   ${UG_MODULE}/Private/vehicle_step.cpp

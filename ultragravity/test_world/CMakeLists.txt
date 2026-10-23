@@ -1,4 +1,5 @@
 add_library(ultragravity_test_world
+  src/replay.cpp
   src/test_world.cpp
 )
 add_library(ultragravity::test_world ALIAS ultragravity_test_world)

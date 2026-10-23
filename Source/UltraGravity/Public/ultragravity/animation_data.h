@@ -19,6 +19,8 @@ struct AnimationData {
     double roll = 0.0;                                   // rad
     double steering_wheel = 0.0;                         // rad, rotation of the steering wheel
     double engine_speed = 0.0;                           // rad/s of the engine
+
+    bool operator==(const AnimationData&) const = default;
 };
 
 // Wraps an angle into [-π, π).

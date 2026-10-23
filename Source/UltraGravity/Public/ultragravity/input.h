@@ -10,6 +10,8 @@ struct DrivingAids {
     bool abs = false;
     int traction_control = 0; // level 0 (off) to traction_control_max
     bool stability_control = false;
+
+    bool operator==(const DrivingAids&) const = default;
 };
 
 // The control commands for one sim tick. The only way to control a car:
@@ -23,6 +25,8 @@ struct InputPacket {
     double handbrake = 0.0; // 0 … 1
     std::int8_t gear_request = 0; // -1 reverse, 0 neutral, 1 … n forward gears
     DrivingAids driving_aids;
+
+    bool operator==(const InputPacket&) const = default;
 };
 
 } // namespace ultragravity

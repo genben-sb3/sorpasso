@@ -119,8 +119,16 @@ Messwerte zur Analyse des Fahrverhaltens, etwa Schlupf, Radlast und Kräfte je R
 _Avoid_: Debug-Daten, Log
 
 **Recording** (Aufzeichnung):
-Die gespeicherten Input packets und Zustände einer Fahrt, aus denen Replays und Ghosts entstehen.
+Die gespeicherten Input packets und Zustände einer Fahrt, aus denen Replays und Ghosts entstehen: jedes Input packet und alle 60 Ticks ein **Snapshot** (vollständiger Zustand), in einem eigenen Binärformat mit Kennung und Versionsnummer.
 _Avoid_: Replay-Datei
+
+**Replay**:
+Die Fahrt aus einer Recording neu simuliert, aus ihren Input packets; im selben Programm bitgenau gleich.
+_Avoid_: Wiedergabe
+
+**Ghost**:
+Ein Auto, das nur die gespeicherten Snapshots einer Recording wiedergibt (dazwischen interpoliert), ohne zu simulieren.
+_Avoid_: Geisterauto, Schatten
 
 **PP value** (PP-Wert):
 Eine Zahl für die Leistungsfähigkeit eines Autos, berechnet aus seinen Ergebnissen in den Test maneuvers. Events setzen damit Obergrenzen.

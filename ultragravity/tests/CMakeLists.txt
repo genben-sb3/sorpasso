@@ -14,6 +14,7 @@ add_executable(ultragravity_tests
   test_maneuver_test.cpp
   abs_test.cpp
   stability_test.cpp
+  recording_test.cpp
 )
 # doctest lives here, nlohmann json in the Unreal module.
 target_include_directories(ultragravity_tests PRIVATE
@@ -22,6 +23,7 @@ target_include_directories(ultragravity_tests PRIVATE
 target_link_libraries(ultragravity_tests PRIVATE ultragravity::tuning)
 # The vehicle files live in the game's Content folder, so packaged builds take them along (ADR 0010).
 target_compile_definitions(ultragravity_tests PRIVATE
+  UG_TESTDATA_DIR="${CMAKE_CURRENT_BINARY_DIR}"
   UG_VEHICLES_DIR="${PROJECT_SOURCE_DIR}/../Content/VehicleFiles")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
