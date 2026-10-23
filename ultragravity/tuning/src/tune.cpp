@@ -1,8 +1,10 @@
 // Measures a car: drives the test maneuvers and prints target, result and
 // deviation as a table.
 //
-//   tune <vehicle.json> [--telemetry <directory>]
+//   tune <vehicle.json> [--telemetry <directory>] [--write-pp]
 //
+// From the results it computes the PP value. With --write-pp it writes it together with the id
+// of the physics version into the vehicle file; without, it warns when the stored PP value is outdated.
 // With --telemetry it writes the telemetry of each test maneuver as <maneuver>.csv.
 // Exit code 0 when all test maneuvers succeeded, 1 for failed ones, 2 for
 // wrong usage or an unreadable vehicle file.
@@ -10,9 +12,11 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <vector>
 
+#include "ultragravity/pp_value.h"
 #include "ultragravity/test_maneuver.h"
 #include "ultragravity/vehicle_file.h"
 
@@ -21,9 +25,12 @@ using namespace ultragravity;
 int main(int argc, char** argv) {
     std::string path;
     std::string telemetry_directory;
+    bool write_pp = false;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--telemetry") == 0 && i + 1 < argc) {
             telemetry_directory = argv[++i];
+        } else if (std::strcmp(argv[i], "--write-pp") == 0) {
+            write_pp = true;
         } else if (path.empty() && argv[i][0] != '-') {
             path = argv[i];
         } else {
@@ -32,7 +39,7 @@ int main(int argc, char** argv) {
         }
     }
     if (path.empty()) {
-        std::cerr << "Usage: tune <vehicle.json> [--telemetry <directory>]\n";
+        std::cerr << "Usage: tune <vehicle.json> [--telemetry <directory>] [--write-pp]\n";
         return 2;
     }
 
@@ -59,5 +66,35 @@ int main(int argc, char** argv) {
     std::cout << format_table(loaded.params.name, measurements);
     const bool all_succeeded =
         std::none_of(measurements.begin(), measurements.end(), [](const Measurement& m) { return m.failed(); });
+
+    const PpResult pp = compute_pp(measurements);
+    if (!pp.value) {
+        std::cerr << '\n' << pp.error;
+        if (write_pp) std::cerr << "The vehicle file stays unchanged.\n";
+        return 1;
+    }
+    const std::string current_id = physics_version_id(loaded.params);
+    std::string text;
+    {
+        std::ifstream file(path, std::ios::binary);
+        text.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    }
+    std::cout << "\nPP value: " << *pp.value << " (physics version " << current_id << ")\n";
+    if (write_pp) {
+        const std::string updated = set_pp(text, {*pp.value, current_id});
+        if (updated.empty()) {
+            std::cerr << path << ": cannot write the PP value\n";
+            return 2;
+        }
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        out << updated;
+        if (!out) {
+            std::cerr << path << ": cannot write the PP value\n";
+            return 2;
+        }
+        std::cout << "Written to " << path << ".\n";
+    } else {
+        std::cout << pp_warning(read_pp(text), current_id);
+    }
     return all_succeeded ? 0 : 1;
 }

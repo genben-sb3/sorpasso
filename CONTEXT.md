@@ -131,8 +131,12 @@ Ein Auto, das nur die gespeicherten Snapshots einer Recording wiedergibt (dazwis
 _Avoid_: Geisterauto, Schatten
 
 **PP value** (PP-Wert):
-Eine Zahl für die Leistungsfähigkeit eines Autos, berechnet aus seinen Ergebnissen in den Test maneuvers. Events setzen damit Obergrenzen.
+Eine Zahl für die Leistungsfähigkeit eines Autos, berechnet aus seinen Ergebnissen in den Test maneuvers. Events setzen damit Obergrenzen. Das Tuning tool schreibt sie mit der Physics version in die Vehicle file (Block `pp`).
 _Avoid_: Rating, Klasse, Performance-Index
+
+**Physics version** (Physikstand):
+Kennung, unter der ein PP value gerechnet wurde: die Prüfsumme einer festen Referenzfahrt mit dem Auto. Ändert sich die Physik oder das Auto, passt der gespeicherte PP value nicht mehr, und das Tuning tool warnt.
+_Avoid_: Version, Build
 
 ## Fahrerunterstützung
 

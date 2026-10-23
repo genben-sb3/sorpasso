@@ -362,7 +362,7 @@ std::string pad(const std::string& text, std::size_t width) {
 
 void write_row(std::ostream& out, const std::string& name, const std::string& target, const std::string& result,
                const std::string& deviation) {
-    out << pad(name, 36) << pad(target, 14) << pad(result, 14) << deviation << '\n';
+    out << pad(name, 50) << pad(target, 14) << pad(result, 14) << deviation << '\n';
 }
 
 int decimals(const Measurement& m) { return m.unit == "m" || m.unit == "km/h" ? 1 : 2; }
@@ -373,7 +373,7 @@ std::string format_table(const std::string& car_name, const std::vector<Measurem
     std::ostringstream out;
     out << "Measurement: " << car_name << "\n\n";
     write_row(out, "Test maneuver", "Target", "Result", "Deviation");
-    out << std::string(74, '-') << '\n';
+    out << std::string(88, '-') << '\n';
     std::string reasons;
     for (const Measurement& m : measurements) {
         const int n = decimals(m);

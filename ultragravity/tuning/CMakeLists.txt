@@ -2,10 +2,13 @@
 add_library(ultragravity_tuning
   src/test_driver.cpp
   src/test_maneuver.cpp
+  src/pp_value.cpp
 )
 add_library(ultragravity::tuning ALIAS ultragravity_tuning)
 
 target_include_directories(ultragravity_tuning PUBLIC include)
+# The PP value edits the vehicle file text with the JSON parser of the Unreal module.
+target_include_directories(ultragravity_tuning PRIVATE ${PROJECT_SOURCE_DIR}/../Source/UltraGravity/ThirdParty)
 target_link_libraries(ultragravity_tuning PUBLIC ultragravity::test_world)
 
 # The terminal program: one command measures a car.
