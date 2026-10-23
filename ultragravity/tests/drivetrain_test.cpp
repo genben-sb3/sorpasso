@@ -537,6 +537,31 @@ TEST_CASE("The automatic pulls away in reverse and does not shift by itself") {
     CHECK(gear(world) >= 1);
 }
 
+TEST_CASE("The automatic pulls away backward from standstill without jitter, its wheels turning backward") {
+    const VehicleParams car = with_automatic();
+    TestWorld world(car, 0.02);
+    Drive drive(world);
+    drive.run(1.5);
+
+    InputPacket reverse;
+    reverse.gear_request = -1;
+    reverse.throttle = 0.4;
+    OscillationDetector speed(0.005);
+    double previous_angle = world.last_step().animation.wheel_angle[rear_left]; // rad
+    int backward_ticks = 0;
+    for (int tick = 0; tick < Drive::ticks(4.0); ++tick) {
+        drive.one_tick(reverse);
+        speed.add(forward_speed(world));
+        const double angle = world.last_step().animation.wheel_angle[rear_left]; // rad
+        if (wrap_angle(angle - previous_angle) < 0.0) ++backward_ticks;
+        previous_angle = angle;
+    }
+    CHECK(gear(world) == -1);
+    CHECK(forward_speed(world) < -1.5); // measured: -7.88 m/s, band: < -1.5 m/s
+    CHECK(speed.longest_run() < 3); // measured: 0, band: < 3
+    CHECK(backward_ticks > Drive::ticks(2.5)); // measured: 480 ticks (4 s), band: > 300 ticks (2.5 s)
+}
+
 TEST_CASE("Two reverse drives with the same input packets yield the same checksum, and reverse counts in it") {
     const auto drive_with = [](std::int8_t gear_request, double throttle) {
         TestWorld world(sports_coupe(), 0.02);

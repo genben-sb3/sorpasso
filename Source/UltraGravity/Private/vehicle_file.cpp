@@ -381,6 +381,8 @@ void check_gearbox(Plausibility& p, const Gearbox& g, const std::string& path) {
         }
     }
     p.positive(g.reverse_ratio, child(path, "reverse_ratio"));
+    // Real reverse gears lie at 3 to 4; above 6 it is a typo.
+    p.at_most(g.reverse_ratio, 6.0, child(path, "reverse_ratio"));
     p.positive(g.final_drive, child(path, "final_drive"));
     p.non_negative(g.shift_time, child(path, "shift_time"));
 }

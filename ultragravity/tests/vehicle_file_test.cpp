@@ -262,6 +262,14 @@ TEST_CASE("The gearbox needs a positive ratio for the reverse gear") {
         CHECK(result.error->field == "drivetrain.gearbox.reverse_ratio");
         CHECK(result.error->message == "must be greater than 0");
     }
+
+    // Real reverse gears lie at 3 to 4; above 6 it is a typo.
+    nlohmann::json too_large = sports_coupe();
+    too_large["drivetrain"]["gearbox"]["reverse_ratio"] = 9.0;
+    const LoadResult rejected = parse(too_large);
+    REQUIRE(rejected.error.has_value());
+    CHECK(rejected.error->field == "drivetrain.gearbox.reverse_ratio");
+    CHECK(rejected.error->message == "must be at most 6");
 }
 
 TEST_CASE("A torque curve point that is not an object is reported with its path") {
